@@ -11,6 +11,40 @@ from csbaoyan_daily.infra.r2 import R2PublishResult
 
 
 class PipelineTests(unittest.TestCase):
+    def test_automatic_date_is_used_for_check_and_r2_key(self) -> None:
+        repo_root = Path("/tmp/csbaoyan-date-test")
+        publish_result = R2PublishResult(
+            report_date="2026-09-07",
+            report_count=69,
+            uploaded_reports=1,
+        )
+        options = PipelineOptions(
+            repo_root=repo_root,
+            report_dir=Path("internal/reports"),
+            skip_generate=True,
+            skip_telegram=True,
+        )
+
+        with patch(
+            "csbaoyan_daily.app.pipeline.default_report_date",
+            return_value="2026-09-07",
+        ), patch(
+            "csbaoyan_daily.app.pipeline.run_report_check",
+            return_value=[],
+        ) as mocked_check, patch(
+            "csbaoyan_daily.app.pipeline.run_publish",
+            return_value=publish_result,
+        ) as mocked_publish:
+            resolved_date = run_pipeline(options)
+
+        resolved_repo_root = repo_root.resolve()
+        expected_path = resolved_repo_root / "internal/reports/2026-09-07.md"
+        self.assertEqual(resolved_date, "2026-09-07")
+        mocked_check.assert_called_once_with(expected_path, resolved_repo_root)
+        publish_options = mocked_publish.call_args.args[0]
+        self.assertEqual(publish_options.report_date, "2026-09-07")
+        self.assertEqual(publish_options.report_path, expected_path)
+
     def test_skip_upload_avoids_publish_and_broadcast(self) -> None:
         options = PipelineOptions(
             repo_root=Path.cwd(),

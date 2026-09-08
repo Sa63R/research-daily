@@ -6,6 +6,7 @@ import re
 import time
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 
 DATE_PATTERN = re.compile(r"(\d{4}-\d{2}-\d{2})T")
@@ -19,6 +20,22 @@ def validate_report_date(value: str) -> str:
         return dt.datetime.strptime(value, "%Y-%m-%d").strftime("%Y-%m-%d")
     except ValueError as exc:
         raise ValueError(f"日期格式无效：{value}，请使用 YYYY-MM-DD。") from exc
+
+
+def previous_report_date(
+    timezone: str,
+    *,
+    now: dt.datetime | None = None,
+) -> str:
+    try:
+        zone = ZoneInfo(timezone)
+    except ZoneInfoNotFoundError as exc:
+        raise ValueError(f"未知时区：{timezone}") from exc
+
+    if now is not None and now.tzinfo is None:
+        raise ValueError("now 必须包含时区信息。")
+    current = now.astimezone(zone) if now is not None else dt.datetime.now(zone)
+    return (current.date() - dt.timedelta(days=1)).isoformat()
 
 
 def _list_json_files(export_dir: Path) -> list[Path]:

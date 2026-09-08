@@ -16,6 +16,13 @@ if [[ ! -f "${repo_root}/.env" ]]; then
     printf 'Error: configure %s/.env before installing the LaunchAgent.\n' "$repo_root" >&2
     exit 2
 fi
+system_offset="$(date '+%z')"
+shanghai_offset="$(TZ=Asia/Shanghai date '+%z')"
+if [[ "$system_offset" != "$shanghai_offset" ]]; then
+    printf '%s\n' \
+        "Warning: launchd uses the macOS system timezone. The 06:30 trigger will not be 06:30 Asia/Shanghai while the offsets differ." \
+        >&2
+fi
 if [[ "$repo_root" == *['&<>']* || "$python_command" == *['&<>']* ]]; then
     printf '%s\n' "Error: paths containing XML special characters are unsupported." >&2
     exit 2

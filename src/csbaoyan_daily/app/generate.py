@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-import datetime as dt
 import logging
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 from ..config import (
     CHAT_SOURCE,
@@ -30,6 +28,7 @@ from ..domain.file_utils import (
     infer_report_date,
     load_chat_export,
     prepare_output_paths,
+    previous_report_date,
     validate_report_date,
 )
 from ..domain.report_generation import extract_all_chunks, generate_final_report
@@ -82,8 +81,7 @@ class GenerateArtifacts:
 
 
 def default_report_date(timezone: str = REPORT_TIMEZONE) -> str:
-    today = dt.datetime.now(ZoneInfo(timezone)).date()
-    return (today - dt.timedelta(days=1)).strftime("%Y-%m-%d")
+    return previous_report_date(timezone)
 
 
 def _resolve_command(command: Path) -> Path:

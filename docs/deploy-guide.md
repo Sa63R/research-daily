@@ -84,6 +84,8 @@ scripts/daily_pipeline.sh --date 2026-09-06 --verify-public
 scripts/install_launch_agent.sh
 ```
 
+`StartCalendarInterval` 使用 macOS 系统时区。要让触发时刻严格等于北京时间 06:30，系统时区需要保持为 `Asia/Shanghai`，或使用与其全年同为 UTC+8 的 `Asia/Singapore`。即使系统时区变化，Python 仍会按 `.env` 中的 `CSBAOYAN_TIMEZONE=Asia/Shanghai` 计算目标日期并读取该日期的 `00:00:00`（含）至次日 `00:00:00`（不含）；变化的只是实际触发时刻。
+
 检查或立即触发：
 
 ```bash

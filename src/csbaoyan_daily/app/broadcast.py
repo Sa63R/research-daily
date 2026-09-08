@@ -1,18 +1,15 @@
 from __future__ import annotations
 
-import datetime as dt
 import logging
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 from ..config import REPORT_DIR, REPORT_TIMEZONE, SITE_BASE_URL, TELEGRAM_BOT_TOKEN, TELEGRAM_CHANNEL_ID, resolve_path
-from ..domain.file_utils import validate_report_date
+from ..domain.file_utils import previous_report_date, validate_report_date
 from ..infra.telegram import compose_message, extract_overview, read_report, resolve_report_path, send_telegram_message
 
 
 def default_report_date() -> str:
-    today = dt.datetime.now(ZoneInfo(REPORT_TIMEZONE)).date()
-    return (today - dt.timedelta(days=1)).strftime("%Y-%m-%d")
+    return previous_report_date(REPORT_TIMEZONE)
 
 
 def resolve_broadcast_config(

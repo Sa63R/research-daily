@@ -99,6 +99,40 @@ class QQSourceTests(unittest.TestCase):
             )
         self.assertEqual(result, [])
 
+    def test_delayed_run_still_keeps_only_the_requested_shanghai_day(self) -> None:
+        zone = dt.timezone(dt.timedelta(hours=8))
+        target_start = int(dt.datetime(2026, 9, 6, tzinfo=zone).timestamp())
+        target_end = int(dt.datetime(2026, 9, 7, tzinfo=zone).timestamp())
+        page = {
+            "messages": [
+                {
+                    "conversation_id": "group:943826679",
+                    "message_id": "inside",
+                    "timestamp": target_end - 1,
+                    "sender": "甲",
+                    "sender_number": "1",
+                    "content": "目标日最后一秒",
+                },
+                {
+                    "conversation_id": "group:943826679",
+                    "message_id": "outside",
+                    "timestamp": target_end,
+                    "sender": "乙",
+                    "sender_number": "2",
+                    "content": "次日零点",
+                },
+            ],
+            "has_more": False,
+        }
+        now = dt.datetime(2026, 9, 10, 6, 30, tzinfo=zone)
+
+        with patch("csbaoyan_daily.infra.qq_source._run_page", return_value=page) as run_page:
+            messages = read_qq_messages(self.options, "2026-09-06", now=now)
+
+        self.assertEqual([message["id"] for message in messages], ["inside"])
+        expected_minutes = int((now.timestamp() - target_start) / 60) + 1
+        self.assertEqual(run_page.call_args.args[1:], (expected_minutes, None))
+
     def test_rejects_repeated_cursor(self) -> None:
         page = {"messages": [], "has_more": True, "next_cursor": "same"}
         with patch("csbaoyan_daily.infra.qq_source._run_page", return_value=page):
