@@ -50,7 +50,6 @@ class R2Config:
 
 @dataclass(frozen=True)
 class R2PublishResult:
-    report_date: str | None
     report_count: int
     uploaded_reports: int
 
@@ -120,7 +119,7 @@ class R2Publisher:
         return key
 
     def build_manifest(self) -> list[dict[str, str]]:
-        keys: list[str] = []
+        dates: set[str] = set()
         continuation_token: str | None = None
         while True:
             kwargs: dict[str, Any] = {
@@ -132,20 +131,22 @@ class R2Publisher:
             response = self.client.list_objects_v2(**kwargs)
             for item in response.get("Contents") or []:
                 key = str(item.get("Key") or "")
-                if REPORT_KEY_PATTERN.fullmatch(key):
-                    keys.append(key)
+                match = REPORT_KEY_PATTERN.fullmatch(key)
+                if match:
+                    try:
+                        dates.add(validate_report_date(match.group(1)))
+                    except ValueError:
+                        continue
             if not response.get("IsTruncated"):
                 break
             continuation_token = str(response.get("NextContinuationToken") or "")
             if not continuation_token:
                 raise RuntimeError("R2 对象列表分页缺少 continuation token。")
 
-        manifest = []
-        for key in sorted(set(keys), reverse=True):
-            match = REPORT_KEY_PATTERN.fullmatch(key)
-            assert match is not None
-            manifest.append({"date": match.group(1), "md_path": key})
-        return manifest
+        return [
+            {"date": date, "md_path": self.report_key(date)}
+            for date in sorted(dates, reverse=True)
+        ]
 
     def upload_manifest(self, manifest: list[dict[str, str]]) -> None:
         body = (json.dumps(manifest, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
@@ -163,7 +164,6 @@ class R2Publisher:
             raise RuntimeError(f"R2 索引未发现刚上传的日报：{key}")
         self.upload_manifest(manifest)
         return R2PublishResult(
-            report_date=key.removeprefix("reports/").removesuffix(".md"),
             report_count=len(manifest),
             uploaded_reports=1,
         )
@@ -179,10 +179,36 @@ class R2Publisher:
         manifest = self.build_manifest()
         self.upload_manifest(manifest)
         return R2PublishResult(
-            report_date=None,
             report_count=len(manifest),
             uploaded_reports=uploaded,
         )
+
+    def _read_public_object(self, key: str, origin: str) -> bytes:
+        request = urllib.request.Request(
+            f"{self.config.public_base_url.rstrip('/')}/{key}",
+            headers={
+                "Origin": origin,
+                "Cache-Control": "no-cache",
+                "User-Agent": PUBLIC_VERIFY_USER_AGENT,
+            },
+        )
+        for attempt in range(1, PUBLIC_VERIFY_ATTEMPTS + 1):
+            try:
+                with urllib.request.urlopen(request, timeout=30) as response:
+                    body = response.read()
+                    allowed_origin = response.headers.get("Access-Control-Allow-Origin")
+                if allowed_origin not in {origin, "*"}:
+                    raise RuntimeError(f"R2 CORS 未允许 {origin}：{key}")
+                return body
+            except urllib.error.HTTPError as exc:
+                if exc.code < 500 or attempt == PUBLIC_VERIFY_ATTEMPTS:
+                    raise RuntimeError(f"R2 公网校验失败：{key}: {exc}") from exc
+            except urllib.error.URLError as exc:
+                if attempt == PUBLIC_VERIFY_ATTEMPTS:
+                    raise RuntimeError(f"R2 公网校验失败：{key}: {exc}") from exc
+            time.sleep(0.5 * attempt)
+
+        raise RuntimeError(f"R2 公网校验失败：{key}")
 
     def verify_public_report(
         self,
@@ -194,36 +220,13 @@ class R2Publisher:
         path = report_path.resolve()
         date = validate_report_date(report_date or path.stem)
         expected = path.read_bytes()
-        base_url = self.config.public_base_url.rstrip("/")
-        for key, expected_body in (
-            (self.report_key(date), expected),
-            ("reports.json", None),
-        ):
-            request = urllib.request.Request(
-                f"{base_url}/{key}",
-                headers={
-                    "Origin": origin,
-                    "Cache-Control": "no-cache",
-                    "User-Agent": PUBLIC_VERIFY_USER_AGENT,
-                },
-            )
-            for attempt in range(1, PUBLIC_VERIFY_ATTEMPTS + 1):
-                try:
-                    with urllib.request.urlopen(request, timeout=30) as response:
-                        body = response.read()
-                        allowed_origin = response.headers.get("Access-Control-Allow-Origin")
-                    break
-                except urllib.error.HTTPError as exc:
-                    if exc.code < 500 or attempt == PUBLIC_VERIFY_ATTEMPTS:
-                        raise RuntimeError(f"R2 公网校验失败：{key}: {exc}") from exc
-                except urllib.error.URLError as exc:
-                    if attempt == PUBLIC_VERIFY_ATTEMPTS:
-                        raise RuntimeError(f"R2 公网校验失败：{key}: {exc}") from exc
-                time.sleep(0.5 * attempt)
-            if expected_body is not None and body != expected_body:
-                raise RuntimeError(f"R2 公网内容不一致：{key}")
-            if allowed_origin not in {origin, "*"}:
-                raise RuntimeError(f"R2 CORS 未允许 {origin}：{key}")
-        manifest = json.loads(body.decode("utf-8"))
-        if not any(item.get("date") == date for item in manifest):
+        report_key = self.report_key(date)
+        if self._read_public_object(report_key, origin) != expected:
+            raise RuntimeError(f"R2 公网内容不一致：{report_key}")
+
+        manifest = json.loads(self._read_public_object("reports.json", origin).decode("utf-8"))
+        if not isinstance(manifest, list) or not all(isinstance(item, dict) for item in manifest):
+            raise RuntimeError("R2 公网索引格式无效。")
+        expected_entry = {"date": date, "md_path": report_key}
+        if expected_entry not in manifest:
             raise RuntimeError(f"R2 公网索引缺少日报：{date}")

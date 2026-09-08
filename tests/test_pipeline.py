@@ -14,7 +14,6 @@ class PipelineTests(unittest.TestCase):
     def test_automatic_date_is_used_for_check_and_r2_key(self) -> None:
         repo_root = Path("/tmp/csbaoyan-date-test")
         publish_result = R2PublishResult(
-            report_date="2026-09-07",
             report_count=69,
             uploaded_reports=1,
         )
@@ -26,7 +25,7 @@ class PipelineTests(unittest.TestCase):
         )
 
         with patch(
-            "csbaoyan_daily.app.pipeline.default_report_date",
+            "csbaoyan_daily.app.pipeline.previous_report_date",
             return_value="2026-09-07",
         ), patch(
             "csbaoyan_daily.app.pipeline.run_report_check",
@@ -44,6 +43,20 @@ class PipelineTests(unittest.TestCase):
         publish_options = mocked_publish.call_args.args[0]
         self.assertEqual(publish_options.report_date, "2026-09-07")
         self.assertEqual(publish_options.report_path, expected_path)
+
+    def test_automatic_date_is_frozen_before_generation(self) -> None:
+        options = PipelineOptions(repo_root=Path.cwd())
+        with patch(
+            "csbaoyan_daily.app.pipeline.previous_report_date",
+            return_value="2026-09-07",
+        ), patch(
+            "csbaoyan_daily.app.pipeline.run_generate_report",
+            side_effect=NoMessagesForDate("2026-09-07"),
+        ) as mocked_generate:
+            resolved_date = run_pipeline(options)
+
+        self.assertEqual(resolved_date, "2026-09-07")
+        self.assertEqual(mocked_generate.call_args.args[0].date, "2026-09-07")
 
     def test_skip_upload_avoids_publish_and_broadcast(self) -> None:
         options = PipelineOptions(
@@ -88,7 +101,6 @@ class PipelineTests(unittest.TestCase):
             skip_release_check=True,
         )
         result = R2PublishResult(
-            report_date="2026-05-18",
             report_count=68,
             uploaded_reports=1,
         )

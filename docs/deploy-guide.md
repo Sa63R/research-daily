@@ -52,10 +52,10 @@ reports/YYYY-MM-DD.md
 
 ```bash
 PYTHONPATH=src .venv/bin/python -m csbaoyan_daily.cli migrate-r2 \
-  --reports-dir pages/data/reports
+  --reports-dir /path/to/private-report-backup
 
 PYTHONPATH=src .venv/bin/python -m csbaoyan_daily.cli verify-r2 \
-  --report-dir pages/data/reports \
+  --report-dir /path/to/private-report-backup \
   --date 2026-05-18
 ```
 

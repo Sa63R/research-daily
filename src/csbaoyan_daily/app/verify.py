@@ -18,6 +18,10 @@ RISKY_WORD_PATTERN = re.compile(r"避雷|坑导|黑奴|高压|恶心|压榨")
 
 def scan_text(path: Path, text: str, repo_root: Path) -> list[str]:
     issues: list[str] = []
+    try:
+        display_path = path.relative_to(repo_root)
+    except ValueError:
+        display_path = path
     checks = [
         (EMAIL_PATTERN, "contains an email address"),
         (URL_PATTERN, "contains a URL or homepage"),
@@ -29,7 +33,7 @@ def scan_text(path: Path, text: str, repo_root: Path) -> list[str]:
     for pattern, label in checks:
         match = pattern.search(text)
         if match:
-            issues.append(f"{path.relative_to(repo_root)}: {label}: {match.group(0)}")
+            issues.append(f"{display_path}: {label}: {match.group(0)}")
     return issues
 
 
@@ -71,8 +75,8 @@ def run_release_check(
 
     if _list_tracked_files(resolved_repo_root, "internal"):
         issues.append("internal/ contains tracked private artifacts")
-    if _list_tracked_files(resolved_repo_root, "pages/data/extracted"):
-        issues.append("pages/data/extracted contains tracked intermediate artifacts")
+    if _list_tracked_files(resolved_repo_root, "pages/data"):
+        issues.append("pages/data contains tracked report artifacts")
 
     if report_date:
         paths = [resolved_reports_dir / f"{report_date}.md"]

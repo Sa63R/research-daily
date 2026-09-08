@@ -71,17 +71,7 @@ class GenerateOptions:
 @dataclass(frozen=True)
 class GenerateArtifacts:
     report_date: str
-    source_name: str
-    export_file: Path | None
-    extracted_path: Path
     report_path: Path
-    transcript_path: Path
-    message_count: int
-    chunk_count: int
-
-
-def default_report_date(timezone: str = REPORT_TIMEZONE) -> str:
-    return previous_report_date(timezone)
 
 
 def _resolve_command(command: Path) -> Path:
@@ -96,12 +86,13 @@ def run_generate_report(options: GenerateOptions) -> GenerateArtifacts:
     target_date = (
         validate_report_date(options.date)
         if options.date
-        else default_report_date(options.timezone)
+        else previous_report_date(options.timezone)
     )
     report_dir = resolve_path(options.report_dir)
     source = options.source.strip().lower()
 
     export_file: Path | None = None
+    inferred_report_date: str | None = None
     if source == "qqnt":
         if options.qq_key_path is None:
             raise ValueError("QQNT_KEY_PATH 不能为空。")
@@ -118,15 +109,12 @@ def run_generate_report(options: GenerateOptions) -> GenerateArtifacts:
             ),
             target_date,
         )
-        report_date = target_date
-        inferred_report_date = target_date
     elif source == "json":
         export_dir = resolve_path(options.export_dir)
         export_file = get_json_file_by_date(export_dir, target_date)
         payload = load_chat_export(export_file)
         messages = extract_messages(payload)
         inferred_report_date = infer_report_date(payload, export_file)
-        report_date = validate_report_date(options.date) if options.date else inferred_report_date
     else:
         raise ValueError("CSBAOYAN_SOURCE 只支持 qqnt 或 json。")
 
@@ -141,8 +129,11 @@ def run_generate_report(options: GenerateOptions) -> GenerateArtifacts:
         max_messages=options.chunk_max_messages,
         overlap_messages=options.chunk_overlap_messages,
     )
+    model = str(options.model or "").strip()
+    if not model:
+        raise ValueError("缺少模型名称。请设置 OPENAI_MODEL 或通过 --model 传入。")
 
-    extracted_path, report_path, transcript_path = prepare_output_paths(report_dir, report_date)
+    extracted_path, report_path, transcript_path = prepare_output_paths(report_dir, target_date)
     write_anonymized_transcript(anonymized_messages, transcript_path)
 
     extraction_client = create_openai_client(options.api_key, options.base_url, options.timeout)
@@ -152,8 +143,12 @@ def run_generate_report(options: GenerateOptions) -> GenerateArtifacts:
         logging.info("使用日期 %s 的导出文件：%s", target_date, export_file)
     else:
         logging.info("使用 QQ 热镜像群聊 %s：%s", options.qq_conversation_id, target_date)
-    if source == "json" and inferred_report_date != target_date:
-        logging.warning("目标日期为 %s，但导出内容推断日期为 %s，将按目标日期输出。", target_date, inferred_report_date)
+    if source == "json" and inferred_report_date and inferred_report_date != target_date:
+        logging.warning(
+            "目标日期为 %s，但导出内容推断日期为 %s，将按目标日期输出。",
+            target_date,
+            inferred_report_date,
+        )
     logging.info("脱敏后消息数：%s，Chunk 数：%s", len(anonymized_messages), len(chunks))
     logging.info("LLM 超时设置：分块提取 %ss，最终汇总 %ss", options.timeout, options.final_timeout)
 
@@ -161,7 +156,7 @@ def run_generate_report(options: GenerateOptions) -> GenerateArtifacts:
         chunks=chunks,
         extracted_path=extracted_path,
         client=extraction_client,
-        model=options.model or OPENAI_MODEL,
+        model=model,
         retries=options.retries,
         temperature=options.temperature,
         max_workers=options.max_workers,
@@ -171,7 +166,7 @@ def run_generate_report(options: GenerateOptions) -> GenerateArtifacts:
         extracted_path=extracted_path,
         final_report_path=report_path,
         client=final_client,
-        model=options.model or OPENAI_MODEL,
+        model=model,
         retries=options.retries,
         temperature=options.temperature,
     )
@@ -181,12 +176,6 @@ def run_generate_report(options: GenerateOptions) -> GenerateArtifacts:
     logging.info("最终日报：%s", report_path)
 
     return GenerateArtifacts(
-        report_date=report_date,
-        source_name=source,
-        export_file=export_file,
-        extracted_path=extracted_path,
+        report_date=target_date,
         report_path=report_path,
-        transcript_path=transcript_path,
-        message_count=len(anonymized_messages),
-        chunk_count=len(chunks),
     )

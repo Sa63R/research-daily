@@ -143,6 +143,27 @@ class QQSourceTests(unittest.TestCase):
                     now=dt.datetime(2026, 9, 7, tzinfo=dt.timezone(dt.timedelta(hours=8))),
                 )
 
+    def test_rejects_incomplete_or_naive_date_window(self) -> None:
+        with self.assertRaisesRegex(ValueError, "尚未结束"):
+            read_qq_messages(
+                self.options,
+                "2026-09-06",
+                now=dt.datetime(
+                    2026,
+                    9,
+                    6,
+                    12,
+                    tzinfo=dt.timezone(dt.timedelta(hours=8)),
+                ),
+            )
+
+        with self.assertRaisesRegex(ValueError, "时区"):
+            read_qq_messages(
+                self.options,
+                "2026-09-06",
+                now=dt.datetime(2026, 9, 7, 6, 30),
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

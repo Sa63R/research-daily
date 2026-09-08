@@ -53,7 +53,7 @@ scripts/daily_pipeline.sh --source json --export-dir /path/to/chatlab-json --dat
 
 # 将现有 Markdown 批量迁移到 R2
 PYTHONPATH=src .venv/bin/python -m csbaoyan_daily.cli migrate-r2 \
-  --reports-dir pages/data/reports
+  --reports-dir /path/to/reports
 ```
 
 目标日期没有有效消息时，流水线正常结束且不会改动 R2 索引。QQ、LLM、隐私检查或 R2 失败时会非零退出，并保留当前公开索引。

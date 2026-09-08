@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+from dataclasses import asdict
 from pathlib import Path
 
 from .app.broadcast import broadcast_report
@@ -190,28 +191,7 @@ def main(argv: list[str] | None = None) -> int:
             run_pipeline(
                 PipelineOptions(
                     repo_root=args.repo_root,
-                    source=generated.source,
-                    export_dir=generated.export_dir,
-                    report_dir=generated.report_dir,
-                    date=generated.date,
-                    timezone=generated.timezone,
-                    qq_command=generated.qq_command,
-                    qq_key_path=generated.qq_key_path,
-                    qq_cache_dir=generated.qq_cache_dir,
-                    qq_data_root=generated.qq_data_root,
-                    qq_account=generated.qq_account,
-                    qq_conversation_id=generated.qq_conversation_id,
-                    model=generated.model,
-                    chunk_max_chars=generated.chunk_max_chars,
-                    chunk_max_messages=generated.chunk_max_messages,
-                    chunk_overlap_messages=generated.chunk_overlap_messages,
-                    retries=generated.retries,
-                    timeout=generated.timeout,
-                    final_timeout=generated.final_timeout,
-                    temperature=generated.temperature,
-                    max_workers=generated.max_workers,
-                    base_url=generated.base_url,
-                    api_key=generated.api_key,
+                    **asdict(generated),
                     skip_generate=args.skip_generate,
                     skip_release_check=args.skip_release_check,
                     skip_upload=args.skip_upload,

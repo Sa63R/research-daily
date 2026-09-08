@@ -3,7 +3,6 @@ from __future__ import annotations
 import datetime as dt
 import json
 import re
-import time
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -53,6 +52,15 @@ def _extract_date_from_filename(export_file: Path) -> str | None:
     return match.group(1) if match else None
 
 
+def _normalize_optional_date(value: str | None) -> str | None:
+    if not value:
+        return None
+    try:
+        return validate_report_date(value)
+    except ValueError:
+        return None
+
+
 def _describe_available_dates(json_files: list[Path]) -> str:
     dates = sorted({date for path in json_files if (date := _extract_date_from_filename(path))}, reverse=True)
     if not dates:
@@ -61,11 +69,6 @@ def _describe_available_dates(json_files: list[Path]) -> str:
     if len(dates) > 10:
         preview = f"{preview} 等 {len(dates)} 个日期"
     return f"可用日期：{preview}"
-
-
-def get_latest_json_file(export_dir: Path) -> Path:
-    json_files = _list_json_files(export_dir)
-    return max(json_files, key=lambda path: path.stat().st_mtime)
 
 
 def get_json_file_by_date(export_dir: Path, report_date: str) -> Path:
@@ -103,17 +106,13 @@ def extract_messages(payload: dict[str, Any]) -> list[dict[str, Any]]:
     return messages
 
 
-def infer_report_date(payload: dict[str, Any], export_file: Path) -> str:
+def infer_report_date(payload: dict[str, Any], export_file: Path) -> str | None:
     statistics = payload.get("statistics") or {}
     time_range = statistics.get("timeRange") or {}
     end_value = str(time_range.get("end") or "").strip()
-    if end_value:
-        return end_value[:10]
-
-    file_date = _extract_date_from_filename(export_file)
-    if file_date:
-        return file_date
-    return time.strftime("%Y-%m-%d")
+    return _normalize_optional_date(end_value[:10]) or _normalize_optional_date(
+        _extract_date_from_filename(export_file)
+    )
 
 
 def ensure_private_directory(path: Path) -> None:

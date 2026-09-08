@@ -8,12 +8,44 @@ const state = {
 };
 
 const dataBaseUrl = String(window.CSBAOYAN_CONFIG?.dataBaseUrl || "").replace(/\/+$/, "");
+const reportDatePattern = /^\d{4}-\d{2}-\d{2}$/;
 
 function dataUrl(path) {
   if (!dataBaseUrl) {
     throw new Error("Missing dataBaseUrl in config.js");
   }
   return `${dataBaseUrl}/${String(path).replace(/^\/+/, "")}`;
+}
+
+function normalizeManifest(value) {
+  if (!Array.isArray(value)) return [];
+
+  const seenDates = new Set();
+  return value.filter((item) => {
+    const date = typeof item?.date === "string" ? item.date : "";
+    const valid = reportDatePattern.test(date)
+      && item.md_path === `reports/${date}.md`
+      && !seenDates.has(date);
+    if (valid) seenDates.add(date);
+    return valid;
+  });
+}
+
+function hasCachedReport(date) {
+  return Object.prototype.hasOwnProperty.call(state.reportsCache, date);
+}
+
+async function fetchReportText(item, { cache = "force-cache", signal } = {}) {
+  if (!item.md_path) throw new Error("Missing report path");
+  if (cache !== "no-store" && hasCachedReport(item.date)) {
+    return state.reportsCache[item.date];
+  }
+
+  const response = await fetch(dataUrl(item.md_path), { cache, signal });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const markdown = await response.text();
+  state.reportsCache[item.date] = markdown;
+  return markdown;
 }
 
 const elements = {
@@ -33,7 +65,6 @@ const elements = {
   dateSwitcherPopover: document.querySelector("#date-switcher-popover"),
   dateSwitcherList: document.querySelector("#date-switcher-list"),
   reportCount: document.querySelector("#report-count"),
-  activeDateLabel: document.querySelector("#active-date-label"),
   loadingState: document.querySelector("#loading-state"),
   reportContent: document.querySelector("#report-content"),
   themeToggle: document.querySelector("#theme-toggle"),
@@ -195,11 +226,7 @@ function setDateSwitcherOpen(isOpen) {
     elements.dateSwitcher.classList.toggle("open", isOpen);
   }
 
-  for (const button of [elements.currentDateBtn]) {
-    if (button) {
-      button.setAttribute("aria-expanded", String(isOpen));
-    }
-  }
+  elements.currentDateBtn?.setAttribute("aria-expanded", String(isOpen));
 }
 
 function closeDateSwitcher() {
@@ -257,11 +284,7 @@ function renderDateSwitcher() {
   if (elements.nextDateBtn) {
     elements.nextDateBtn.disabled = resolvedIndex <= 0;
   }
-  for (const button of [elements.currentDateBtn]) {
-    if (button) {
-      button.disabled = false;
-    }
-  }
+  if (elements.currentDateBtn) elements.currentDateBtn.disabled = false;
 
   elements.dateSwitcherList.innerHTML = state.manifest
     .map((item) => {
@@ -322,15 +345,7 @@ async function loadRecentReportSummaries() {
     }
 
     try {
-      if (!item.md_path) {
-        throw new Error("Missing report path");
-      }
-      const response = await fetch(dataUrl(item.md_path), { cache: "force-cache" });
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      const markdown = await response.text();
-      summary.textContent = extractOverview(markdown);
+      summary.textContent = extractOverview(await fetchReportText(item));
     } catch (error) {
       console.error(error);
       summary.textContent = "概览加载失败，点击查看日报正文。";
@@ -339,9 +354,6 @@ async function loadRecentReportSummaries() {
 }
 
 function updateHeader(item) {
-  if (elements.activeDateLabel) {
-    elements.activeDateLabel.textContent = "";
-  }
   elements.reportCount.textContent = `${state.manifest.length} 篇日报`;
   document.title = `${item.date} | 绿群日报`;
 }
@@ -369,16 +381,7 @@ async function loadReport(date) {
   const signal = state.abortController.signal;
 
   try {
-    if (!item.md_path) {
-      throw new Error("Missing report path");
-    }
-
-    const response = await fetch(dataUrl(item.md_path), { cache: "no-store", signal });
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-
-    const markdown = await response.text();
+    const markdown = await fetchReportText(item, { cache: "no-store", signal });
     elements.reportContent.innerHTML = renderMarkdown(markdown);
     showLoading(false);
     requestAnimationFrame(() => {
@@ -401,14 +404,12 @@ async function loadManifest() {
       throw new Error(`HTTP ${response.status}`);
     }
 
-    state.manifest = await response.json();
-    if (!Array.isArray(state.manifest) || !state.manifest.length) {
-      state.manifest = [];
+    state.manifest = normalizeManifest(await response.json());
+    if (!state.manifest.length) {
       renderHomeView();
       elements.reportCount.textContent = "0 篇日报";
       showLoading(false);
       renderDateSwitcher();
-      showMessage("empty-state", "还没有可展示的日报，等下一次生成后这里会自动更新。");
       showHomeView();
       return;
     }
@@ -519,17 +520,11 @@ function closeSearch() {
 }
 
 async function prefetchAllReports() {
-  if (state.isSearching || Object.keys(state.reportsCache).length === state.manifest.length) return;
+  if (state.isSearching || state.manifest.every((item) => hasCachedReport(item.date))) return;
   state.isSearching = true;
   try {
-    const promises = state.manifest.map(async (item) => {
-      if (state.reportsCache[item.date]) return;
-      const res = await fetch(dataUrl(item.md_path), { cache: "force-cache" });
-      if (res.ok) {
-        state.reportsCache[item.date] = await res.text();
-      }
-    });
-    await Promise.all(promises);
+    const missingItems = state.manifest.filter((item) => !hasCachedReport(item.date));
+    await Promise.all(missingItems.map((item) => fetchReportText(item)));
     // If user already typed something while fetching, perform search
     if (elements.searchInput.value.trim()) {
       performSearch(elements.searchInput.value);
@@ -590,15 +585,6 @@ function performSearch(query) {
       <div class="search-result-snippet">${res.snippet}</div>
     </a>
   `).join('');
-
-  elements.searchResults.querySelectorAll('.search-result-item').forEach(item => {
-    item.addEventListener('click', (e) => {
-      e.preventDefault();
-      const date = item.dataset.date;
-      setHashDate(date);
-      closeSearch();
-    });
-  });
 }
 
 function initSearch() {
@@ -607,6 +593,14 @@ function initSearch() {
   elements.searchBtn.addEventListener('click', openSearch);
   elements.closeSearchBtn.addEventListener('click', closeSearch);
   elements.searchBackdrop.addEventListener('click', closeSearch);
+  elements.searchResults.addEventListener('click', (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    const item = target?.closest('.search-result-item');
+    if (!(item instanceof HTMLElement) || !item.dataset.date) return;
+    event.preventDefault();
+    setHashDate(item.dataset.date);
+    closeSearch();
+  });
   
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && state.dateSwitcherOpen) {

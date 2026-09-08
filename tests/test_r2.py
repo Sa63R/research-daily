@@ -169,6 +169,27 @@ class R2PublisherTests(unittest.TestCase):
         self.assertEqual(calls, 3)
         sleep.assert_called_once_with(0.5)
 
+    def test_public_verify_rejects_malformed_manifest(self) -> None:
+        origin = "https://csbaoyan.icelon.top"
+
+        def fake_urlopen(request, timeout):
+            body = (
+                b'["not-an-object"]'
+                if request.full_url.endswith("reports.json")
+                else b"# report\n"
+            )
+            return FakeHTTPResponse(body, origin)
+
+        with tempfile.TemporaryDirectory() as directory:
+            report = Path(directory) / "2026-09-06.md"
+            report.write_bytes(b"# report\n")
+            with patch(
+                "csbaoyan_daily.infra.r2.urllib.request.urlopen",
+                side_effect=fake_urlopen,
+            ):
+                with self.assertRaisesRegex(RuntimeError, "索引格式"):
+                    self.publisher.verify_public_report(report, origin=origin)
+
 
 if __name__ == "__main__":
     unittest.main()

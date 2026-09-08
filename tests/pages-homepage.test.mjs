@@ -26,6 +26,8 @@ assert.match(appJs, /function\s+renderHomeView\s*\(/, "app.js should populate ho
 assert.match(appJs, /function\s+extractOverview\s*\(/, "app.js should extract overview text from report markdown");
 assert.match(appJs, /function\s+loadRecentReportSummaries\s*\(/, "app.js should load recent report summaries for the homepage");
 assert.match(appJs, /function\s+dataUrl\s*\(/, "app.js should resolve all report URLs through R2");
+assert.match(appJs, /function\s+normalizeManifest\s*\(/, "app.js should reject malformed manifest entries");
+assert.match(appJs, /function\s+fetchReportText\s*\(/, "app.js should share report fetching and cache logic");
 assert.doesNotMatch(appJs, /\.\/data\//, "app.js should not read report data from GitHub Pages");
 assert.match(configJs, /https:\/\/data\.csbaoyan\.icelon\.top/, "config should point at the R2 custom domain");
 assert.ok(appJs.includes(".replace(/^([-+*]|\\d+[.)])\\s+/, \"\")"), "overview extraction should strip markdown list markers");

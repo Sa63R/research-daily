@@ -8,10 +8,6 @@ from ..domain.file_utils import previous_report_date, validate_report_date
 from ..infra.telegram import compose_message, extract_overview, read_report, resolve_report_path, send_telegram_message
 
 
-def default_report_date() -> str:
-    return previous_report_date(REPORT_TIMEZONE)
-
-
 def resolve_broadcast_config(
     *,
     bot_token: str | None = None,
@@ -48,7 +44,11 @@ def broadcast_report(
     if config is None:
         return False
 
-    resolved_report_date = validate_report_date(report_date) if report_date else default_report_date()
+    resolved_report_date = (
+        validate_report_date(report_date)
+        if report_date
+        else previous_report_date(REPORT_TIMEZONE)
+    )
     resolved_bot_token, resolved_channel_id, resolved_site_base_url = config
 
     resolved_report_path = (

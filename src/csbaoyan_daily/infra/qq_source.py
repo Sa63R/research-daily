@@ -41,9 +41,11 @@ def _date_window(
     day = dt.date.fromisoformat(validate_report_date(report_date))
     start = dt.datetime.combine(day, dt.time.min, tzinfo=zone)
     end = start + dt.timedelta(days=1)
+    if now is not None and now.tzinfo is None:
+        raise ValueError("now 必须包含时区信息。")
     current = now.astimezone(zone) if now is not None else dt.datetime.now(zone)
-    if current <= start:
-        raise ValueError(f"目标日期 {report_date} 尚未开始，无法读取消息。")
+    if current < end:
+        raise ValueError(f"目标日期 {report_date} 尚未结束，无法生成完整日报。")
     return start, end, current
 
 
@@ -131,8 +133,6 @@ def read_qq_messages(
     *,
     now: dt.datetime | None = None,
 ) -> list[dict[str, Any]]:
-    if not str(options.key_path):
-        raise ValueError("QQNT_KEY_PATH 不能为空。")
     if not options.conversation_id.startswith("group:"):
         raise ValueError("QQNT_CONVERSATION_ID 必须是 group: 开头的群聊标识。")
 
