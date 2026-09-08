@@ -39,8 +39,13 @@ def configure_logging() -> None:
 
 
 def add_generate_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--source", choices=("qqnt", "json"), default=CHAT_SOURCE)
-    parser.add_argument("--export-dir", type=Path, default=EXPORT_DIR, help="Legacy ChatLab JSON directory.")
+    parser.add_argument(
+        "--source",
+        choices=("export", "json", "qqnt"),
+        default=CHAT_SOURCE,
+        help="export invokes qqnt-export-macos; json consumes an existing ChatLab file. qqnt is a compatibility alias for export.",
+    )
+    parser.add_argument("--export-dir", type=Path, default=EXPORT_DIR, help="Private ChatLab JSON input/output directory.")
     parser.add_argument("--report-dir", type=Path, default=REPORT_DIR, help="Private local report output directory.")
     parser.add_argument("--date", "--report-date", dest="date", type=validate_report_date, help="Target report date in YYYY-MM-DD format.")
     parser.add_argument("--timezone", default=REPORT_TIMEZONE, help="IANA timezone used for daily message boundaries.")

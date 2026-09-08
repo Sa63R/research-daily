@@ -18,7 +18,7 @@ EXPORT_DIR = Path(os.getenv("CSBAOYAN_EXPORT_DIR", "chat_exports"))
 REPORT_DIR = Path(os.getenv("CSBAOYAN_REPORT_DIR", "internal/reports"))
 
 # Message source config
-CHAT_SOURCE = os.getenv("CSBAOYAN_SOURCE", "qqnt").strip().lower()
+CHAT_SOURCE = os.getenv("CSBAOYAN_SOURCE", "export").strip().lower()
 REPORT_TIMEZONE = os.getenv("CSBAOYAN_TIMEZONE", "Asia/Shanghai").strip()
 QQNT_EXPORT_COMMAND = Path(os.getenv("QQNT_EXPORT_COMMAND", "qqnt-export-macos"))
 _qqnt_key_path = os.getenv("QQNT_KEY_PATH", "").strip()

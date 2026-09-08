@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -29,11 +28,12 @@ from ..domain.file_utils import (
     load_chat_export,
     prepare_output_paths,
     previous_report_date,
+    validate_chatlab_payload,
     validate_report_date,
 )
 from ..domain.report_generation import extract_all_chunks, generate_final_report
 from ..infra.openai_client import create_openai_client
-from ..infra.qq_source import QQSourceOptions, read_qq_messages
+from ..infra.chat_export import ChatExportOptions, export_chatlab_day
 
 
 class NoMessagesForDate(RuntimeError):
@@ -74,14 +74,6 @@ class GenerateArtifacts:
     report_path: Path
 
 
-def _resolve_command(command: Path) -> Path:
-    expanded = command.expanduser()
-    if expanded.is_absolute() or len(expanded.parts) > 1:
-        return resolve_path(expanded).resolve()
-    discovered = shutil.which(str(expanded))
-    return Path(discovered) if discovered else expanded
-
-
 def run_generate_report(options: GenerateOptions) -> GenerateArtifacts:
     target_date = (
         validate_report_date(options.date)
@@ -93,12 +85,12 @@ def run_generate_report(options: GenerateOptions) -> GenerateArtifacts:
 
     export_file: Path | None = None
     inferred_report_date: str | None = None
-    if source == "qqnt":
+    if source in {"export", "qqnt"}:
         if options.qq_key_path is None:
             raise ValueError("QQNT_KEY_PATH 不能为空。")
-        messages = read_qq_messages(
-            QQSourceOptions(
-                command=_resolve_command(options.qq_command),
+        export_file = export_chatlab_day(
+            ChatExportOptions(
+                command=options.qq_command,
                 key_path=resolve_path(options.qq_key_path),
                 cache_dir=resolve_path(options.qq_cache_dir),
                 conversation_id=options.qq_conversation_id,
@@ -108,15 +100,19 @@ def run_generate_report(options: GenerateOptions) -> GenerateArtifacts:
                 timeout=options.timeout,
             ),
             target_date,
+            resolve_path(options.export_dir),
         )
     elif source == "json":
         export_dir = resolve_path(options.export_dir)
         export_file = get_json_file_by_date(export_dir, target_date)
-        payload = load_chat_export(export_file)
-        messages = extract_messages(payload)
-        inferred_report_date = infer_report_date(payload, export_file)
     else:
-        raise ValueError("CSBAOYAN_SOURCE 只支持 qqnt 或 json。")
+        raise ValueError("CSBAOYAN_SOURCE 只支持 export 或 json（qqnt 为兼容别名）。")
+
+    assert export_file is not None
+    payload = load_chat_export(export_file)
+    validate_chatlab_payload(payload)
+    messages = extract_messages(payload)
+    inferred_report_date = infer_report_date(payload, export_file)
 
     if not messages:
         raise NoMessagesForDate(target_date)
@@ -139,10 +135,7 @@ def run_generate_report(options: GenerateOptions) -> GenerateArtifacts:
     extraction_client = create_openai_client(options.api_key, options.base_url, options.timeout)
     final_client = create_openai_client(options.api_key, options.base_url, options.final_timeout)
 
-    if export_file is not None:
-        logging.info("使用日期 %s 的导出文件：%s", target_date, export_file)
-    else:
-        logging.info("使用 QQ 热镜像群聊 %s：%s", options.qq_conversation_id, target_date)
+    logging.info("使用日期 %s 的 ChatLab JSON：%s", target_date, export_file)
     if source == "json" and inferred_report_date and inferred_report_date != target_date:
         logging.warning(
             "目标日期为 %s，但导出内容推断日期为 %s，将按目标日期输出。",

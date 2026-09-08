@@ -10,10 +10,26 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from csbaoyan_daily.app.generate import GenerateOptions, run_generate_report
-from csbaoyan_daily.domain.file_utils import infer_report_date
+from csbaoyan_daily.domain.file_utils import (
+    extract_messages,
+    get_json_file_by_date,
+    infer_report_date,
+    validate_chatlab_payload,
+)
 
 
 class JsonSourceTests(unittest.TestCase):
+    def test_finds_date_only_chatlab_filename(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            export_dir = Path(directory)
+            export_file = export_dir / "chatlab-2026-09-06.json"
+            export_file.write_text("{}", encoding="utf-8")
+
+            self.assertEqual(
+                get_json_file_by_date(export_dir, "2026-09-06"),
+                export_file,
+            )
+
     def test_target_date_controls_output_when_payload_date_disagrees(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -23,13 +39,18 @@ class JsonSourceTests(unittest.TestCase):
             export_file.write_text(
                 json.dumps(
                     {
+                        "chatlab": {"version": "0.0.2"},
+                        "meta": {"name": "测试群", "platform": "QQ", "type": "group"},
+                        "members": [],
                         "statistics": {"timeRange": {"end": "2026-09-05T23:59:59"}},
                         "messages": [
                             {
-                                "id": "1",
-                                "time": "2026-09-06 12:00:00",
-                                "sender": {"uid": "u1", "name": "群友甲"},
-                                "content": {"text": "一条测试消息"},
+                                "platformMessageId": "1",
+                                "sender": "u1",
+                                "accountName": "群友甲",
+                                "timestamp": 1788667200,
+                                "type": 0,
+                                "content": "一条测试消息",
                             }
                         ],
                     },
@@ -69,6 +90,120 @@ class JsonSourceTests(unittest.TestCase):
                 path,
             )
         )
+
+    def test_chatlab_messages_are_normalized_with_reply_context(self) -> None:
+        payload = {
+            "statistics": {
+                "timeRange": {
+                    "start": "2026-09-06T00:00:00+08:00",
+                    "end": "2026-09-07T00:00:00+08:00",
+                }
+            },
+            "members": [
+                {
+                    "platformId": "u1",
+                    "accountName": "甲",
+                    "groupNickname": "甲同学",
+                },
+                {
+                    "platformId": "u2",
+                    "accountName": "乙",
+                    "groupNickname": "乙同学",
+                },
+            ],
+            "messages": [
+                {
+                    "platformMessageId": "1",
+                    "sender": "u1",
+                    "accountName": "甲",
+                    "groupNickname": "甲同学",
+                    "timestamp": 1788624000,
+                    "type": 0,
+                    "content": "原消息",
+                },
+                {
+                    "platformMessageId": "2",
+                    "sender": "u2",
+                    "accountName": "乙",
+                    "groupNickname": "乙同学",
+                    "timestamp": 1788624060,
+                    "type": 25,
+                    "content": "回复正文",
+                    "replyToMessageId": "1",
+                    "replyContext": {
+                        "sender": "u1",
+                        "accountName": "甲同学",
+                        "timestamp": 1788624000,
+                        "content": "原消息",
+                    },
+                },
+            ],
+        }
+
+        messages = extract_messages(payload)
+
+        self.assertEqual(messages[1]["id"], "2")
+        self.assertEqual(
+            messages[1]["content"]["text"],
+            "[回复 甲同学: 原消息]\n回复正文",
+        )
+        self.assertEqual(
+            messages[1]["content"]["elements"],
+            [
+                {
+                    "type": "reply",
+                    "data": {
+                        "referencedMessageId": "1",
+                        "senderName": "甲同学",
+                        "content": "原消息",
+                    },
+                }
+            ],
+        )
+        self.assertEqual(messages[1]["time"], "2026-09-06 00:01:00")
+
+    def test_chatlab_range_start_controls_inferred_date(self) -> None:
+        payload = {
+            "statistics": {
+                "timeRange": {
+                    "start": "2026-09-06T00:00:00+08:00",
+                    "end": "2026-09-07T00:00:00+08:00",
+                }
+            }
+        }
+
+        self.assertEqual(infer_report_date(payload, Path("chat.json")), "2026-09-06")
+
+    def test_reply_context_survives_without_sender_identity(self) -> None:
+        payload = {
+            "statistics": {
+                "timeRange": {"start": "2026-09-06T00:00:00+08:00"}
+            },
+            "members": [],
+            "messages": [
+                {
+                    "platformMessageId": "2",
+                    "sender": "u2",
+                    "accountName": "乙",
+                    "timestamp": 1788624060,
+                    "type": 25,
+                    "content": "回复正文",
+                    "replyToMessageId": "outside-range",
+                    "replyContext": {"content": "范围外的原消息"},
+                }
+            ],
+        }
+
+        messages = extract_messages(payload)
+
+        self.assertEqual(
+            messages[0]["content"]["text"],
+            "[回复 未知用户: 范围外的原消息]\n回复正文",
+        )
+
+    def test_rejects_non_chatlab_input_at_the_public_boundary(self) -> None:
+        with self.assertRaisesRegex(ValueError, "chatlab.version"):
+            validate_chatlab_payload({"messages": []})
 
 
 if __name__ == "__main__":
