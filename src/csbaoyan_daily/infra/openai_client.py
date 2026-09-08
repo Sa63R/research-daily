@@ -12,8 +12,12 @@ def create_openai_client(api_key: str | None, base_url: str | None, timeout: flo
     except ImportError as exc:
         raise ImportError("未安装 openai 库，请先执行 `pip install -r requirements.txt`。") from exc
 
-    client_kwargs: dict[str, Any] = {"api_key": api_key, "timeout": timeout}
+    client_kwargs: dict[str, Any] = {
+        "api_key": api_key,
+        "timeout": timeout,
+        # Retry in report_generation.py so attempts are logged and bounded.
+        "max_retries": 0,
+    }
     if base_url:
         client_kwargs["base_url"] = base_url
     return OpenAI(**client_kwargs)
-

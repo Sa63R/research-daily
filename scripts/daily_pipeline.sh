@@ -137,4 +137,8 @@ export PYTHONPATH="${resolved_repo_root}/src${PYTHONPATH:+:${PYTHONPATH}}"
 write_step "Repository: $resolved_repo_root"
 write_step "Python: $resolved_python_command"
 write_step "Delegating to Python CLI"
-"$resolved_python_command" -m csbaoyan_daily.cli pipeline --repo-root "$resolved_repo_root" "${pipeline_args[@]}"
+if [[ ${pipeline_args+x} ]]; then
+    "$resolved_python_command" -m csbaoyan_daily.cli pipeline --repo-root "$resolved_repo_root" "${pipeline_args[@]}"
+else
+    "$resolved_python_command" -m csbaoyan_daily.cli pipeline --repo-root "$resolved_repo_root"
+fi
