@@ -10,7 +10,6 @@ from typing import Any
 
 DATE_PATTERN = re.compile(r"(\d{4}-\d{2}-\d{2})T")
 REPORT_FILE_PATTERN = re.compile(r"^(\d{4}-\d{2}-\d{2})\.md$")
-MANIFEST_FILENAME = "reports.json"
 
 
 def validate_report_date(value: str) -> str:
@@ -98,11 +97,11 @@ def infer_report_date(payload: dict[str, Any], export_file: Path) -> str:
     return time.strftime("%Y-%m-%d")
 
 
-def prepare_output_paths(pages_dir: Path, report_date: str) -> tuple[Path, Path, Path]:
-    pages_data_dir = pages_dir / "data"
-    extracted_dir = pages_dir.parent / "internal" / "extracted"
-    reports_dir = pages_data_dir / "reports"
-    transcripts_dir = pages_dir.parent / "internal" / "transcripts"
+def prepare_output_paths(report_dir: Path, report_date: str) -> tuple[Path, Path, Path]:
+    internal_dir = report_dir.parent
+    extracted_dir = internal_dir / "extracted"
+    reports_dir = report_dir
+    transcripts_dir = internal_dir / "transcripts"
     extracted_dir.mkdir(parents=True, exist_ok=True)
     reports_dir.mkdir(parents=True, exist_ok=True)
     transcripts_dir.mkdir(parents=True, exist_ok=True)
@@ -112,7 +111,7 @@ def prepare_output_paths(pages_dir: Path, report_date: str) -> tuple[Path, Path,
     return extracted_path, report_path, transcript_path
 
 
-def _iter_report_paths(reports_dir: Path) -> list[tuple[str, Path]]:
+def iter_report_paths(reports_dir: Path) -> list[tuple[str, Path]]:
     if not reports_dir.exists():
         return []
 
@@ -126,28 +125,3 @@ def _iter_report_paths(reports_dir: Path) -> list[tuple[str, Path]]:
             report_paths.append((match.group(1), path))
 
     return sorted(report_paths, key=lambda item: item[0], reverse=True)
-
-
-def write_reports_manifest(pages_dir: Path) -> list[dict[str, str]]:
-    data_dir = pages_dir / "data"
-    reports_dir = data_dir / "reports"
-    data_dir.mkdir(parents=True, exist_ok=True)
-    reports_dir.mkdir(parents=True, exist_ok=True)
-
-    manifest: list[dict[str, str]] = []
-    for report_date, report_path in _iter_report_paths(reports_dir):
-        if not report_path.read_text(encoding="utf-8").strip():
-            continue
-        manifest.append(
-            {
-                "date": report_date,
-                "md_path": f"reports/{report_path.name}",
-            }
-        )
-
-    manifest_path = data_dir / MANIFEST_FILENAME
-    manifest_path.write_text(
-        json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
-    return manifest

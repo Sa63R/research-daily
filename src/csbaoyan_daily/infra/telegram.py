@@ -44,8 +44,8 @@ def compose_message(report_date: str, overview: str, site_base_url: str) -> str:
     )
 
 
-def resolve_report_path(pages_dir: Path, report_date: str) -> Path:
-    return pages_dir / "data" / "reports" / f"{report_date}.md"
+def resolve_report_path(report_dir: Path, report_date: str) -> Path:
+    return report_dir / f"{report_date}.md"
 
 
 def read_report(report_path: Path) -> str:

@@ -4,7 +4,7 @@ import re
 import subprocess
 from pathlib import Path
 
-from ..config import PAGES_DIR, resolve_path
+from ..config import REPORT_DIR, resolve_path
 
 EMAIL_PATTERN = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
 URL_PATTERN = re.compile(
@@ -53,21 +53,37 @@ def format_release_issues(issues: list[str]) -> str:
     return "\n".join(lines)
 
 
-def run_release_check(repo_root: Path, pages_dir: Path = PAGES_DIR) -> list[str]:
+def run_report_check(report_path: Path, repo_root: Path) -> list[str]:
+    path = resolve_path(report_path, repo_root.resolve())
+    if not path.is_file():
+        return [f"report file does not exist: {path}"]
+    return scan_text(path, path.read_text(encoding="utf-8"), repo_root.resolve())
+
+
+def run_release_check(
+    repo_root: Path,
+    reports_dir: Path = REPORT_DIR,
+    report_date: str | None = None,
+) -> list[str]:
     resolved_repo_root = repo_root.resolve()
-    public_reports_dir = resolve_path(pages_dir, resolved_repo_root) / "data" / "reports"
+    resolved_reports_dir = resolve_path(reports_dir, resolved_repo_root)
     issues: list[str] = []
 
-    tracked_public_extracted = _list_tracked_files(resolved_repo_root, "pages/data/extracted")
-    if tracked_public_extracted:
-        issues.append("pages/data/extracted still has tracked public intermediate files")
+    if _list_tracked_files(resolved_repo_root, "internal"):
+        issues.append("internal/ contains tracked private artifacts")
+    if _list_tracked_files(resolved_repo_root, "pages/data/extracted"):
+        issues.append("pages/data/extracted contains tracked intermediate artifacts")
 
-    tracked_transcripts = _list_tracked_files(resolved_repo_root, "internal/transcripts")
-    if tracked_transcripts:
-        issues.append("internal/transcripts still has tracked internal transcript files")
-
-    if public_reports_dir.exists():
-        for path in sorted(public_reports_dir.glob("*.md")):
+    if report_date:
+        paths = [resolved_reports_dir / f"{report_date}.md"]
+    else:
+        paths = sorted(resolved_reports_dir.glob("*.md")) if resolved_reports_dir.exists() else []
+    if not paths:
+        issues.append(f"no report files found: {resolved_reports_dir}")
+    for path in paths:
+        if not path.is_file():
+            issues.append(f"report file does not exist: {path}")
+        else:
             issues.extend(scan_text(path, path.read_text(encoding="utf-8"), resolved_repo_root))
 
     return issues

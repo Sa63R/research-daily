@@ -132,7 +132,7 @@ function Invoke-Main {
         "$pythonPathPrefix$([IO.Path]::PathSeparator)$previousPythonPath"
     }
     try {
-        Invoke-RepoPython -PythonSpec $PythonSpec -Arguments @("-m", "csbaoyan_daily.cli", "pipeline", "--repo-root", $ResolvedRepoRoot) + $ForwardedArgs
+        Invoke-RepoPython -PythonSpec $PythonSpec -Arguments @("-m", "csbaoyan_daily.cli", "pipeline", "--repo-root", $ResolvedRepoRoot, "--source", "json") + $ForwardedArgs
     }
     finally {
         if ([string]::IsNullOrWhiteSpace($previousPythonPath)) {

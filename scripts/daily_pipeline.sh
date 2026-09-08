@@ -113,9 +113,16 @@ else
 fi
 
 lock_path="${resolved_log_dir}/daily_pipeline.lock"
-if command -v flock >/dev/null 2>&1; then
+if command -v shlock >/dev/null 2>&1; then
+    shlock -f "$lock_path" -p "$$" || die "Another daily pipeline run is already in progress."
+    trap 'rm -f "$lock_path"' EXIT
+elif command -v flock >/dev/null 2>&1; then
     exec 9>"$lock_path"
     flock -n 9 || die "Another daily pipeline run is already in progress."
+else
+    lock_dir="${lock_path}.d"
+    mkdir "$lock_dir" 2>/dev/null || die "Another daily pipeline run is already in progress."
+    trap 'rmdir "$lock_dir"' EXIT
 fi
 
 log_path="${resolved_log_dir}/daily_pipeline_$(date '+%Y%m%d_%H%M%S').log"

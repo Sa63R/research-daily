@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 
 const indexHtml = await readFile(new URL("../pages/index.html", import.meta.url), "utf8");
 const appJs = await readFile(new URL("../pages/app.js", import.meta.url), "utf8");
+const configJs = await readFile(new URL("../pages/config.js", import.meta.url), "utf8");
 const stylesCss = await readFile(new URL("../pages/styles.css", import.meta.url), "utf8");
 
 assert.match(indexHtml, /id="home-view"/, "index.html should include a homepage view");
@@ -10,8 +11,8 @@ assert.match(indexHtml, /id="reader-view"/, "index.html should wrap the report r
 assert.match(indexHtml, /id="read-latest-btn"/, "homepage should expose a read-latest action");
 assert.match(indexHtml, /id="recent-reports-list"/, "homepage should expose a recent reports list");
 assert.match(indexHtml, /id="home-link"/, "header brand area should expose a home link");
-assert.match(indexHtml, /class="pause-banner"/, "homepage should expose a pause-update banner");
-assert.match(indexHtml, /docs\/pause-update\.md/, "pause-update banner should link to the pause detail note");
+assert.doesNotMatch(indexHtml, /pause-banner/, "homepage should not show the retired pause banner");
+assert.match(indexHtml, /src="\.\/config\.js/, "page should load the public data-source config");
 assert.match(indexHtml, /href="https:\/\/t\.me\/csbaoyan"/, "header status area should link to the Telegram channel");
 assert.match(indexHtml, /class="status-chip" aria-label="Telegram Channel"/, "header status area should expose a Telegram status chip");
 assert.match(indexHtml, /class="home-actions"\s+role="group"\s+aria-label="快捷入口"/, "quick actions should expose a named group");
@@ -24,12 +25,15 @@ assert.match(appJs, /function\s+showReaderView\s*\(/, "app.js should render the 
 assert.match(appJs, /function\s+renderHomeView\s*\(/, "app.js should populate homepage data from the manifest");
 assert.match(appJs, /function\s+extractOverview\s*\(/, "app.js should extract overview text from report markdown");
 assert.match(appJs, /function\s+loadRecentReportSummaries\s*\(/, "app.js should load recent report summaries for the homepage");
+assert.match(appJs, /function\s+dataUrl\s*\(/, "app.js should resolve all report URLs through R2");
+assert.doesNotMatch(appJs, /\.\/data\//, "app.js should not read report data from GitHub Pages");
+assert.match(configJs, /https:\/\/data\.csbaoyan\.icelon\.top/, "config should point at the R2 custom domain");
 assert.ok(appJs.includes(".replace(/^([-+*]|\\d+[.)])\\s+/, \"\")"), "overview extraction should strip markdown list markers");
 assert.match(appJs, /const\s+targetDate\s*=\s*getHashDate\(\)/, "manifest loading should not force a latest-date hash");
 assert.match(appJs, /catch \(error\) \{\s*console\.error\(error\);\s*showReaderView\(\);/s, "manifest load failure should reveal the reader error state");
 
 assert.match(stylesCss, /\.home-view\b/, "styles.css should style the homepage view");
-assert.match(stylesCss, /\.pause-banner\b/, "styles.css should style the pause-update banner");
+assert.doesNotMatch(stylesCss, /\.pause-banner\b/, "retired pause-banner styles should be removed");
 assert.match(stylesCss, /\.recent-reports-list\b/, "styles.css should style the recent reports list");
 assert.match(stylesCss, /\.recent-report-summary\b/, "styles.css should style recent report overview text");
 assert.match(stylesCss, /\.contribute-section\b/, "styles.css should style the contribution section");

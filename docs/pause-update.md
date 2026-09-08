@@ -1,4 +1,6 @@
-# 暂停更新说明
+# 暂停更新的历史说明
+
+> 这是 2026 年 5 月的历史说明。项目现已改用本机 QQ 只读热镜像和 Cloudflare R2 恢复自动更新。
 
 <div align="center">
   <img src="assets/IMG_3348.jpg" alt="强制下线截图" width="35%">

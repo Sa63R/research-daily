@@ -5,18 +5,19 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
+from csbaoyan_daily.app.generate import NoMessagesForDate
 from csbaoyan_daily.app.pipeline import PipelineOptions, run_pipeline
-from csbaoyan_daily.infra.git_publish import PublishResult
+from csbaoyan_daily.infra.r2 import R2PublishResult
 
 
 class PipelineTests(unittest.TestCase):
-    def test_skip_commit_avoids_publish_and_broadcast(self) -> None:
+    def test_skip_upload_avoids_publish_and_broadcast(self) -> None:
         options = PipelineOptions(
             repo_root=Path.cwd(),
             date="2026-05-18",
             skip_generate=True,
             skip_release_check=True,
-            skip_commit=True,
+            skip_upload=True,
         )
 
         with patch("csbaoyan_daily.app.pipeline.run_publish") as mocked_publish, patch(
@@ -28,26 +29,21 @@ class PipelineTests(unittest.TestCase):
         mocked_publish.assert_not_called()
         mocked_broadcast.assert_not_called()
 
-    def test_no_changes_skips_broadcast(self) -> None:
-        options = PipelineOptions(
-            repo_root=Path.cwd(),
-            date="2026-05-18",
-            skip_generate=True,
-            skip_release_check=True,
-            skip_push=False,
-        )
-
+    def test_no_messages_skips_check_publish_and_broadcast(self) -> None:
+        options = PipelineOptions(repo_root=Path.cwd(), date="2026-05-18")
         with patch(
-            "csbaoyan_daily.app.pipeline.run_publish",
-            return_value=PublishResult(changes_detected=False, committed=False, pushed=False),
-        ) as mocked_publish, patch("csbaoyan_daily.app.pipeline.broadcast_report") as mocked_broadcast, patch(
-            "csbaoyan_daily.app.pipeline.run_publish_preflight",
-            return_value="main",
-        ):
+            "csbaoyan_daily.app.pipeline.run_generate_report",
+            side_effect=NoMessagesForDate("2026-05-18"),
+        ), patch("csbaoyan_daily.app.pipeline.run_report_check") as mocked_check, patch(
+            "csbaoyan_daily.app.pipeline.run_publish"
+        ) as mocked_publish, patch(
+            "csbaoyan_daily.app.pipeline.broadcast_report"
+        ) as mocked_broadcast:
             resolved_date = run_pipeline(options)
 
         self.assertEqual(resolved_date, "2026-05-18")
-        mocked_publish.assert_called_once()
+        mocked_check.assert_not_called()
+        mocked_publish.assert_not_called()
         mocked_broadcast.assert_not_called()
 
     def test_successful_publish_triggers_broadcast(self) -> None:
@@ -57,17 +53,17 @@ class PipelineTests(unittest.TestCase):
             skip_generate=True,
             skip_release_check=True,
         )
+        result = R2PublishResult(
+            report_date="2026-05-18",
+            report_count=68,
+            uploaded_reports=1,
+        )
 
         with patch(
-            "csbaoyan_daily.app.pipeline.run_publish",
-            return_value=PublishResult(changes_detected=True, committed=True, pushed=True, branch="main"),
+            "csbaoyan_daily.app.pipeline.run_publish", return_value=result
         ) as mocked_publish, patch(
-            "csbaoyan_daily.app.pipeline.broadcast_report",
-            return_value=True,
-        ) as mocked_broadcast, patch(
-            "csbaoyan_daily.app.pipeline.run_publish_preflight",
-            return_value="main",
-        ):
+            "csbaoyan_daily.app.pipeline.broadcast_report", return_value=True
+        ) as mocked_broadcast:
             resolved_date = run_pipeline(options)
 
         self.assertEqual(resolved_date, "2026-05-18")

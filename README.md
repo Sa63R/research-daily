@@ -1,75 +1,69 @@
 # 绿群日报（CS Baoyan Chat Daily） 📰
 
-CS（Computer Science） 保研群（[绿群](https://github.com/CS-BAOYAN)）每日 AI 信息总结（非官方）
+CS（Computer Science）保研群（[绿群](https://github.com/CS-BAOYAN)）每日 AI 信息总结（非官方）。
 
-在线查看 Pages：
+- 网站：https://csbaoyan.icelon.top
+- 日报数据：Cloudflare R2
+- 默认消息源：[qqnt-export-macos](https://github.com/jielosc/qqnt-export-macos) 本地只读热镜像
 
-- https://csbaoyan.icelon.top
+## 工作流
 
-## 自行部署
+每天 06:30（北京时间）处理前一天 `00:00–24:00` 的群消息：
 
-Pages 目前已暂时停止更新，如果你想自行运行绿群日报，可以参考 [部署与使用指南](./docs/deploy-guide.md)，其中包含环境准备、配置、定时任务和前端部署的完整说明。
+1. 调用本机 `qqnt-export-macos recent`，按游标读完绿群消息；
+2. 严格过滤目标日期，对发送者、联系方式和链接进行匿名化；
+3. 用 OpenAI 兼容 API 分块提取并生成 Markdown 日报；
+4. 对最终报告执行隐私风险检查；
+5. 上传 `reports/YYYY-MM-DD.md` 到 R2，再刷新 `reports.json`；
+6. 可选发送 Telegram 概览。
 
-## Changelog
+原始 QQ 正文只在进程内存中使用。脱敏记录、中间结果和最终报告保存在被 Git 忽略的 `internal/`；GitHub Pages 仓库只保存前端代码，不再提交日报数据。
 
-### 2026-05-20
+## 快速开始
 
-- 由于一些原因，给项目运行带来阻力，日报暂时停止更新（[查看详情](./docs/pause-update.md)）
-- 完善项目使用文档，方便大家自行部署。
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+cp .env.example .env
+chmod 600 .env
+```
 
-### 2026-05-19
+编辑 `.env`，至少配置：
 
-- 整理了项目结构，后续维护会更清楚一些
-- 项目迁移到 Linux 服务器上，后续运行及维护会更稳定
+- `QQNT_EXPORT_COMMAND`、`QQNT_KEY_PATH`、`QQNT_CONVERSATION_ID`
+- `OPENAI_BASE_URL`、`OPENAI_API_KEY`、`OPENAI_MODEL`
+- `R2_ACCOUNT_ID`、`R2_ACCESS_KEY_ID`、`R2_SECRET_ACCESS_KEY`
 
-### 2026-05-14
+QQ 桥接的安装和 key 获取请参考 [qqnt-export-macos 文档](https://github.com/jielosc/qqnt-export-macos)。R2 部署、历史迁移和定时任务见[部署指南](./docs/deploy-guide.md)。
 
-- 日报内容覆盖时间范围已从 `05:00 ~ 次日05:00` 调整为 `00:00 ~ 24:00`
-- 运行逻辑已移除对“夕颜”账号的特殊映射，并取消日报生成中针对该 bot 的定制提示词
+## CLI
+
+```bash
+# 从 QQ 热镜像生成某日的本地日报
+PYTHONPATH=src .venv/bin/python -m csbaoyan_daily.cli generate --date 2026-09-06
+
+# 完整日更：生成、检查、上传 R2、可选 Telegram
+scripts/daily_pipeline.sh
+
+# 只生成和检查，不上传
+scripts/daily_pipeline.sh --skip-upload
+
+# 用旧 ChatLab JSON 回填
+scripts/daily_pipeline.sh --source json --export-dir /path/to/chatlab-json --date 2026-05-18
+
+# 将现有 Markdown 批量迁移到 R2
+PYTHONPATH=src .venv/bin/python -m csbaoyan_daily.cli migrate-r2 \
+  --reports-dir pages/data/reports
+```
+
+目标日期没有有效消息时，流水线正常结束且不会改动 R2 索引。QQ、LLM、隐私检查或 R2 失败时会非零退出，并保留当前公开索引。
 
 ## 免责声明
 
-绿群日报，本质上是借助 AI 工具对群内消息进行总结，内容可能存在不完全准确的情况，阅读时注意甄别。涉及夏令营/预推免等相关信息，请以官方平台发布的内容为准。
+日报由 AI 从群聊中整理，可能存在遗漏或错误。涉及夏令营、预推免、招生制度和导师信息时，请以官方通知及公开资料为准。
 
-项目会尽量对聊天内容做匿名化处理，以降低身份暴露风险；但在少数语境下，仍不能完全排除基于上下文进行识别的可能。
+项目会尽量匿名化聊天内容，但无法保证所有上下文都绝对不可识别。如果你发现身份暴露、内容错误或其他风险，请通过 [GitHub Issues](https://github.com/jielosc/csbaoyan-chat-daily/issues/new) 反馈。
 
-如果你认为仓库中的内容可能涉及身份暴露、隐私泄露或其他不适合公开的信息，请及时联系我，我会尽快核实并处理。
+## License
 
-## 为什么做绿群日报？
-
-- 对保研有帮助的信息常常混在大量无关的聊天消息里
-- 绿群有一定人数上限，会定期清理长期不发言的人，不是所有人都能一直留在群里
-- 群消息量巨大，普通人很难长期、高频地完整跟进
-
-所以做日报的目的很直接：把群聊里那些对保研有帮助的信息尽量沉淀下来，降低绿群外同学获取信息的门槛，同时让没有时间阅读海量群消息的人方便获取群内精华信息
-
-## Workflow 🔄
-
-1. 读取已经导出的绿群聊天 JSON
-2. 对聊天内容做清洗和匿名化处理，尽量保留信息、去掉不必要的身份暴露
-3. 按主题和上下文分块提取有帮助内容，过滤灌水与重复信息
-4. 用 AI 将分块结果进一步整理，生成结构化日报
-5. 把最终日报同步到静态页面目录，方便归档和公开浏览
-
-运行过程中，产物大概分两类：
-
-- `internal/`：本地生成的中间产物，比如脱敏后的聊天记录、提取草稿等，默认不放入 GitHub 仓库
-- `pages/data/reports/`：最终公开的日报内容，便于归档和浏览
-
-## Acknowledgments
-
-绿群日报中的“绿群”，来源于 CS-BAOYAN 社区：
-
-- https://github.com/CS-BAOYAN
-
-聊天记录导出使用了开源工具：
-
-- https://github.com/shuakami/qq-chat-exporter
-
-感谢在绿群中提供保研相关内容的贡献者，感谢相关开源项目和社区一直以来提供的工具和维护工作。
-
-## Contributing 💡
-
-欢迎提 issue、分享想法、提改进建议，也欢迎直接发 PR，一起把这份日报做得更有用。
-
-项目制作不易，且在运行过程中会消耗大量 tokens。如果你觉得它对你有帮助，也欢迎点一个 Star 支持一下。
+[MIT](./LICENSE)

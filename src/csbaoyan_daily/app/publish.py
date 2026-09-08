@@ -3,36 +3,47 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from ..infra.git_publish import (
-    PublishResult,
-    assert_git_origin,
-    assert_upstream_synced,
-    get_current_branch,
-    publish_pathspec,
+from ..config import (
+    R2_ACCESS_KEY_ID,
+    R2_ACCOUNT_ID,
+    R2_BUCKET,
+    R2_PUBLIC_BASE_URL,
+    R2_SECRET_ACCESS_KEY,
 )
+from ..infra.r2 import R2Config, R2Publisher, R2PublishResult
 
 
 @dataclass(frozen=True)
 class PublishOptions:
-    repo_root: Path
-    push: bool = True
-    pathspec: str = "pages/data"
-    commit_message: str = "chore: update pages data"
+    report_path: Path
+    report_date: str | None = None
+    verify_public: bool = False
 
 
-def run_publish_preflight(repo_root: Path) -> str:
-    resolved_repo_root = repo_root.resolve()
-    assert_git_origin(resolved_repo_root)
-    branch = get_current_branch(resolved_repo_root)
-    assert_upstream_synced(resolved_repo_root, branch, "preflight")
-    return branch
-
-
-def run_publish(options: PublishOptions) -> PublishResult:
-    return publish_pathspec(
-        repo_root=options.repo_root.resolve(),
-        pathspec=options.pathspec,
-        commit_message=options.commit_message,
-        push=options.push,
+def r2_config_from_environment() -> R2Config:
+    return R2Config(
+        account_id=str(R2_ACCOUNT_ID or "").strip(),
+        access_key_id=str(R2_ACCESS_KEY_ID or "").strip(),
+        secret_access_key=str(R2_SECRET_ACCESS_KEY or "").strip(),
+        bucket=str(R2_BUCKET or "").strip(),
+        public_base_url=str(R2_PUBLIC_BASE_URL or "").strip(),
     )
 
+
+def run_publish(options: PublishOptions) -> R2PublishResult:
+    publisher = R2Publisher(r2_config_from_environment())
+    result = publisher.publish(options.report_path, options.report_date)
+    if options.verify_public:
+        publisher.verify_public_report(options.report_path, options.report_date)
+    return result
+
+
+def run_migrate(reports_dir: Path) -> R2PublishResult:
+    return R2Publisher(r2_config_from_environment()).migrate(reports_dir)
+
+
+def run_public_verify(report_path: Path, report_date: str | None = None) -> None:
+    R2Publisher(r2_config_from_environment()).verify_public_report(
+        report_path,
+        report_date,
+    )

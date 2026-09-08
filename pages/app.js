@@ -7,6 +7,15 @@ const state = {
   dateSwitcherOpen: false,
 };
 
+const dataBaseUrl = String(window.CSBAOYAN_CONFIG?.dataBaseUrl || "").replace(/\/+$/, "");
+
+function dataUrl(path) {
+  if (!dataBaseUrl) {
+    throw new Error("Missing dataBaseUrl in config.js");
+  }
+  return `${dataBaseUrl}/${String(path).replace(/^\/+/, "")}`;
+}
+
 const elements = {
   homeLink: document.querySelector("#home-link"),
   homeView: document.querySelector("#home-view"),
@@ -316,7 +325,7 @@ async function loadRecentReportSummaries() {
       if (!item.md_path) {
         throw new Error("Missing report path");
       }
-      const response = await fetch(`./data/${item.md_path}`, { cache: "force-cache" });
+      const response = await fetch(dataUrl(item.md_path), { cache: "force-cache" });
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
@@ -364,7 +373,7 @@ async function loadReport(date) {
       throw new Error("Missing report path");
     }
 
-    const response = await fetch(`./data/${item.md_path}`, { cache: "no-store", signal });
+    const response = await fetch(dataUrl(item.md_path), { cache: "no-store", signal });
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
@@ -387,7 +396,7 @@ async function loadManifest() {
   showLoading(true);
 
   try {
-    const response = await fetch("./data/reports.json", { cache: "no-store" });
+    const response = await fetch(dataUrl("reports.json"), { cache: "no-store" });
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
@@ -424,7 +433,7 @@ async function loadManifest() {
     elements.reportCount.textContent = "读取失败";
     showLoading(false);
     renderDateSwitcher();
-    showMessage("error-state", "日报索引加载失败，请确认 pages/data 已成功生成。");
+    showMessage("error-state", "日报索引加载失败，请稍后刷新重试。");
   }
 }
 
@@ -515,7 +524,7 @@ async function prefetchAllReports() {
   try {
     const promises = state.manifest.map(async (item) => {
       if (state.reportsCache[item.date]) return;
-      const res = await fetch(`./data/${item.md_path}`, { cache: "force-cache" });
+      const res = await fetch(dataUrl(item.md_path), { cache: "force-cache" });
       if (res.ok) {
         state.reportsCache[item.date] = await res.text();
       }

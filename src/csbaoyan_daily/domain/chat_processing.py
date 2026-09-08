@@ -378,9 +378,6 @@ def anonymize_messages(messages: list[dict[str, Any]]) -> list[AnonymizedMessage
         message_time = str(message.get("time") or "").strip() or "UNKNOWN_TIME"
         anonymized.append(AnonymizedMessage(time=message_time, speaker=alias, text=text))
 
-    if not anonymized:
-        raise ValueError("没有可用于摘要的有效聊天消息。")
-
     return anonymized
 
 

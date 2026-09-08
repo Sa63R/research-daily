@@ -2,6 +2,7 @@ __pycache__/
 *.py[cod]
 
 .env
+.wrangler/
 .venv/
 venv/
 
@@ -13,6 +14,7 @@ venv/
 
 chat_exports/
 internal/
+pages/data/
 logs/
 *.log
 Thumbs.db

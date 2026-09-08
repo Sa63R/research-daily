@@ -6,11 +6,26 @@ import sys
 from pathlib import Path
 
 from .app.broadcast import broadcast_report
-from .app.generate import GenerateOptions, run_generate_report
+from .app.generate import GenerateOptions, NoMessagesForDate, run_generate_report
 from .app.pipeline import PipelineOptions, run_pipeline
-from .app.publish import PublishOptions, run_publish
+from .app.publish import PublishOptions, run_migrate, run_public_verify, run_publish
 from .app.verify import format_release_issues, run_release_check
-from .config import EXPORT_DIR, OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_MODEL, PAGES_DIR
+from .config import (
+    CHAT_SOURCE,
+    EXPORT_DIR,
+    OPENAI_API_KEY,
+    OPENAI_BASE_URL,
+    OPENAI_MODEL,
+    QQNT_ACCOUNT,
+    QQNT_CACHE_DIR,
+    QQNT_CONVERSATION_ID,
+    QQNT_DATA_ROOT,
+    QQNT_EXPORT_COMMAND,
+    QQNT_KEY_PATH,
+    REPORT_DIR,
+    REPORT_TIMEZONE,
+    resolve_path,
+)
 from .domain.file_utils import validate_report_date
 
 
@@ -23,82 +38,113 @@ def configure_logging() -> None:
 
 
 def add_generate_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--export-dir", type=Path, default=EXPORT_DIR, help="Directory containing exported QQ chat JSON files.")
-    parser.add_argument("--pages-dir", type=Path, default=PAGES_DIR, help="Pages directory that stores site data.")
+    parser.add_argument("--source", choices=("qqnt", "json"), default=CHAT_SOURCE)
+    parser.add_argument("--export-dir", type=Path, default=EXPORT_DIR, help="Legacy ChatLab JSON directory.")
+    parser.add_argument("--report-dir", type=Path, default=REPORT_DIR, help="Private local report output directory.")
     parser.add_argument("--date", "--report-date", dest="date", type=validate_report_date, help="Target report date in YYYY-MM-DD format.")
+    parser.add_argument("--timezone", default=REPORT_TIMEZONE, help="IANA timezone used for daily message boundaries.")
+    parser.add_argument("--qq-command", type=Path, default=QQNT_EXPORT_COMMAND)
+    parser.add_argument("--qq-key", type=Path, default=QQNT_KEY_PATH)
+    parser.add_argument("--qq-cache", type=Path, default=QQNT_CACHE_DIR)
+    parser.add_argument("--qq-data-root", type=Path, default=QQNT_DATA_ROOT)
+    parser.add_argument("--qq-account", default=QQNT_ACCOUNT)
+    parser.add_argument("--qq-conversation", default=QQNT_CONVERSATION_ID)
     parser.add_argument("--model", default=OPENAI_MODEL, help="OpenAI-compatible model name.")
-    parser.add_argument("--chunk-max-chars", type=int, default=30000, help="Maximum character count per chunk.")
-    parser.add_argument("--chunk-max-messages", type=int, default=600, help="Maximum message count per chunk.")
-    parser.add_argument("--chunk-overlap-messages", type=int, default=30, help="Number of overlapping messages between adjacent chunks.")
-    parser.add_argument("--retries", type=int, default=3, help="Maximum retry count for failed LLM calls.")
-    parser.add_argument("--timeout", type=float, default=120.0, help="LLM request timeout in seconds.")
-    parser.add_argument("--final-timeout", type=float, default=300.0, help="Timeout in seconds for the final aggregation request.")
-    parser.add_argument("--temperature", type=float, default=0.2, help="Sampling temperature for the LLM.")
-    parser.add_argument("--max-workers", type=int, default=4, help="Worker count for chunk extraction.")
-    parser.add_argument("--base-url", default=OPENAI_BASE_URL, help="Optional custom base URL for an OpenAI-compatible API.")
-    parser.add_argument("--api-key", default=OPENAI_API_KEY, help="Optional API key for the OpenAI-compatible API.")
+    parser.add_argument("--chunk-max-chars", type=int, default=30000)
+    parser.add_argument("--chunk-max-messages", type=int, default=600)
+    parser.add_argument("--chunk-overlap-messages", type=int, default=30)
+    parser.add_argument("--retries", type=int, default=3)
+    parser.add_argument("--timeout", type=float, default=120.0)
+    parser.add_argument("--final-timeout", type=float, default=300.0)
+    parser.add_argument("--temperature", type=float, default=0.2)
+    parser.add_argument("--max-workers", type=int, default=4)
+    parser.add_argument("--base-url", default=OPENAI_BASE_URL)
+    parser.add_argument("--api-key", default=OPENAI_API_KEY)
+
+
+def _generate_options(args: argparse.Namespace) -> GenerateOptions:
+    return GenerateOptions(
+        source=args.source,
+        export_dir=args.export_dir,
+        report_dir=args.report_dir,
+        date=args.date,
+        timezone=args.timezone,
+        qq_command=args.qq_command,
+        qq_key_path=args.qq_key,
+        qq_cache_dir=args.qq_cache,
+        qq_data_root=args.qq_data_root,
+        qq_account=args.qq_account,
+        qq_conversation_id=args.qq_conversation,
+        model=args.model,
+        chunk_max_chars=args.chunk_max_chars,
+        chunk_max_messages=args.chunk_max_messages,
+        chunk_overlap_messages=args.chunk_overlap_messages,
+        retries=args.retries,
+        timeout=args.timeout,
+        final_timeout=args.final_timeout,
+        temperature=args.temperature,
+        max_workers=args.max_workers,
+        base_url=args.base_url,
+        api_key=args.api_key,
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="CS Baoyan chat daily report tools.")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    generate_parser = subparsers.add_parser("generate", help="Generate a daily report from a chat export.")
+    generate_parser = subparsers.add_parser("generate", help="Generate a daily report.")
     add_generate_arguments(generate_parser)
 
-    verify_parser = subparsers.add_parser("verify", help="Run release checks against generated reports.")
-    verify_parser.add_argument("--repo-root", type=Path, default=Path.cwd(), help="Repository root path.")
-    verify_parser.add_argument("--pages-dir", type=Path, default=PAGES_DIR, help="Pages directory that stores site data.")
+    verify_parser = subparsers.add_parser("verify", help="Check one or more local reports.")
+    verify_parser.add_argument("--repo-root", type=Path, default=Path.cwd())
+    verify_parser.add_argument("--report-dir", type=Path, default=REPORT_DIR)
+    verify_parser.add_argument("--date", type=validate_report_date)
 
-    broadcast_parser = subparsers.add_parser("broadcast", help="Send the latest report overview to Telegram.")
-    broadcast_parser.add_argument("--date", "--report-date", dest="date", type=validate_report_date, help="Report date in YYYY-MM-DD format.")
-    broadcast_parser.add_argument("--pages-dir", type=Path, default=PAGES_DIR, help="Pages directory that stores site data.")
+    broadcast_parser = subparsers.add_parser("broadcast", help="Send a report overview to Telegram.")
+    broadcast_parser.add_argument("--date", type=validate_report_date)
+    broadcast_parser.add_argument("--report-dir", type=Path, default=REPORT_DIR)
 
-    publish_parser = subparsers.add_parser("publish", help="Commit and optionally push pages/data changes.")
-    publish_parser.add_argument("--repo-root", type=Path, default=Path.cwd(), help="Repository root path.")
-    publish_parser.add_argument("--skip-push", action="store_true", help="Commit locally without pushing.")
+    publish_parser = subparsers.add_parser("publish", help="Publish one local report to R2.")
+    publish_parser.add_argument("--date", type=validate_report_date, required=True)
+    publish_parser.add_argument("--report-dir", type=Path, default=REPORT_DIR)
+    publish_parser.add_argument("--verify-public", action="store_true")
 
-    pipeline_parser = subparsers.add_parser("pipeline", help="Run generate, verify and publish in order.")
-    pipeline_parser.add_argument("--repo-root", type=Path, default=Path.cwd(), help="Repository root path.")
+    migrate_parser = subparsers.add_parser("migrate-r2", help="Upload a directory of reports to R2.")
+    migrate_parser.add_argument("--reports-dir", type=Path, required=True)
+    migrate_parser.add_argument("--repo-root", type=Path, default=Path.cwd())
+
+    public_parser = subparsers.add_parser("verify-r2", help="Verify a report through the public R2 domain.")
+    public_parser.add_argument("--date", type=validate_report_date, required=True)
+    public_parser.add_argument("--report-dir", type=Path, default=REPORT_DIR)
+
+    pipeline_parser = subparsers.add_parser("pipeline", help="Generate, verify, publish and broadcast.")
+    pipeline_parser.add_argument("--repo-root", type=Path, default=Path.cwd())
     add_generate_arguments(pipeline_parser)
-    pipeline_parser.add_argument("--skip-generate", action="store_true", help="Skip report generation.")
-    pipeline_parser.add_argument("--skip-release-check", action="store_true", help="Skip release checks.")
-    pipeline_parser.add_argument("--skip-commit", action="store_true", help="Skip all git operations and Telegram broadcast.")
-    pipeline_parser.add_argument("--skip-push", action="store_true", help="Commit locally without pushing or broadcasting.")
-    pipeline_parser.add_argument("--skip-telegram", action="store_true", help="Skip Telegram broadcast after a successful push.")
+    pipeline_parser.add_argument("--skip-generate", action="store_true")
+    pipeline_parser.add_argument("--skip-release-check", action="store_true")
+    pipeline_parser.add_argument("--skip-upload", action="store_true")
+    pipeline_parser.add_argument("--skip-telegram", action="store_true")
+    pipeline_parser.add_argument("--verify-public", action="store_true")
 
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     configure_logging()
-    parser = build_parser()
-    args = parser.parse_args(argv)
+    args = build_parser().parse_args(argv)
 
     try:
         if args.command == "generate":
-            run_generate_report(
-                GenerateOptions(
-                    export_dir=args.export_dir,
-                    pages_dir=args.pages_dir,
-                    date=args.date,
-                    model=args.model,
-                    chunk_max_chars=args.chunk_max_chars,
-                    chunk_max_messages=args.chunk_max_messages,
-                    chunk_overlap_messages=args.chunk_overlap_messages,
-                    retries=args.retries,
-                    timeout=args.timeout,
-                    final_timeout=args.final_timeout,
-                    temperature=args.temperature,
-                    max_workers=args.max_workers,
-                    base_url=args.base_url,
-                    api_key=args.api_key,
-                )
-            )
+            run_generate_report(_generate_options(args))
             return 0
 
         if args.command == "verify":
-            issues = run_release_check(repo_root=args.repo_root, pages_dir=args.pages_dir)
+            issues = run_release_check(
+                repo_root=args.repo_root,
+                reports_dir=args.report_dir,
+                report_date=args.date,
+            )
             if issues:
                 print(format_release_issues(issues))
                 return 1
@@ -106,46 +152,83 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         if args.command == "broadcast":
-            broadcast_report(report_date=args.date, pages_dir=args.pages_dir)
+            broadcast_report(report_date=args.date, report_dir=args.report_dir)
             return 0
 
         if args.command == "publish":
-            run_publish(PublishOptions(repo_root=args.repo_root, push=not args.skip_push))
+            report_path = resolve_path(args.report_dir) / f"{args.date}.md"
+            result = run_publish(
+                PublishOptions(
+                    report_path=report_path,
+                    report_date=args.date,
+                    verify_public=args.verify_public,
+                )
+            )
+            print(f"R2 publish complete: {result.report_count} reports indexed.")
+            return 0
+
+        if args.command == "migrate-r2":
+            issues = run_release_check(args.repo_root, args.reports_dir)
+            if issues:
+                print(format_release_issues(issues))
+                return 1
+            result = run_migrate(resolve_path(args.reports_dir, args.repo_root.resolve()))
+            print(
+                f"R2 migration complete: {result.uploaded_reports} uploaded, "
+                f"{result.report_count} reports indexed."
+            )
+            return 0
+
+        if args.command == "verify-r2":
+            report_path = resolve_path(args.report_dir) / f"{args.date}.md"
+            run_public_verify(report_path, args.date)
+            print(f"R2 public verification passed for {args.date}.")
             return 0
 
         if args.command == "pipeline":
+            generated = _generate_options(args)
             run_pipeline(
                 PipelineOptions(
                     repo_root=args.repo_root,
-                    export_dir=args.export_dir,
-                    pages_dir=args.pages_dir,
-                    date=args.date,
-                    model=args.model,
-                    chunk_max_chars=args.chunk_max_chars,
-                    chunk_max_messages=args.chunk_max_messages,
-                    chunk_overlap_messages=args.chunk_overlap_messages,
-                    retries=args.retries,
-                    timeout=args.timeout,
-                    final_timeout=args.final_timeout,
-                    temperature=args.temperature,
-                    max_workers=args.max_workers,
-                    base_url=args.base_url,
-                    api_key=args.api_key,
+                    source=generated.source,
+                    export_dir=generated.export_dir,
+                    report_dir=generated.report_dir,
+                    date=generated.date,
+                    timezone=generated.timezone,
+                    qq_command=generated.qq_command,
+                    qq_key_path=generated.qq_key_path,
+                    qq_cache_dir=generated.qq_cache_dir,
+                    qq_data_root=generated.qq_data_root,
+                    qq_account=generated.qq_account,
+                    qq_conversation_id=generated.qq_conversation_id,
+                    model=generated.model,
+                    chunk_max_chars=generated.chunk_max_chars,
+                    chunk_max_messages=generated.chunk_max_messages,
+                    chunk_overlap_messages=generated.chunk_overlap_messages,
+                    retries=generated.retries,
+                    timeout=generated.timeout,
+                    final_timeout=generated.final_timeout,
+                    temperature=generated.temperature,
+                    max_workers=generated.max_workers,
+                    base_url=generated.base_url,
+                    api_key=generated.api_key,
                     skip_generate=args.skip_generate,
                     skip_release_check=args.skip_release_check,
-                    skip_commit=args.skip_commit,
-                    skip_push=args.skip_push,
+                    skip_upload=args.skip_upload,
                     skip_telegram=args.skip_telegram,
+                    verify_public=args.verify_public,
                 )
             )
             return 0
+    except NoMessagesForDate as exc:
+        logging.info("%s 跳过生成与发布。", exc)
+        return 0
     except Exception as exc:
         logging.exception("%s failed: %s", args.command, exc)
         return 1
 
-    parser.error(f"Unsupported command: {args.command}")
     return 2
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())
