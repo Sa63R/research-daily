@@ -99,6 +99,72 @@ class QQSourceTests(unittest.TestCase):
             )
         self.assertEqual(result, [])
 
+    def test_preserves_structured_mentions_from_qqnt(self) -> None:
+        page = {
+            "messages": [
+                {
+                    "conversation_id": "group:943826679",
+                    "message_id": "target",
+                    "timestamp": 1788627600,
+                    "sender": "周丽峰",
+                    "sender_number": "10001",
+                    "content": "我说了一句话",
+                    "content_metadata": {"mentions": [], "elements": []},
+                },
+                {
+                    "conversation_id": "group:943826679",
+                    "message_id": "reply",
+                    "timestamp": 1788627660,
+                    "sender": "回复者",
+                    "sender_number": "10002",
+                    "content": "[回复]@周丽峰全是九",
+                    "content_metadata": {
+                        "mentions": [
+                            {"uid": "u_10001", "uin": "10001", "name": "周丽峰"}
+                        ],
+                        "elements": [
+                            {
+                                "type": "at",
+                                "data": {
+                                    "uid": "u_10001",
+                                    "uin": "10001",
+                                    "name": "周丽峰",
+                                },
+                            }
+                        ],
+                    },
+                },
+            ],
+            "has_more": False,
+        }
+
+        with patch("csbaoyan_daily.infra.qq_source._run_page", return_value=page):
+            messages = read_qq_messages(
+                self.options,
+                "2026-09-06",
+                now=dt.datetime(
+                    2026,
+                    9,
+                    7,
+                    tzinfo=dt.timezone(dt.timedelta(hours=8)),
+                ),
+            )
+
+        reply = messages[1]
+        self.assertEqual(
+            reply["content"]["mentions"],
+            [{"uid": "u_10001", "uin": "10001", "name": "周丽峰"}],
+        )
+        self.assertEqual(
+            reply["content"]["elements"],
+            [
+                {
+                    "type": "at",
+                    "data": {"uid": "u_10001", "uin": "10001", "name": "周丽峰"},
+                }
+            ],
+        )
+
     def test_delayed_run_still_keeps_only_the_requested_shanghai_day(self) -> None:
         zone = dt.timezone(dt.timedelta(hours=8))
         target_start = int(dt.datetime(2026, 9, 6, tzinfo=zone).timestamp())

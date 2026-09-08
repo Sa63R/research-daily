@@ -102,7 +102,20 @@ def _normalize_message(message: dict[str, Any], zone: ZoneInfo) -> dict[str, Any
         timestamp = int(message.get("timestamp") or 0)
     except (TypeError, ValueError):
         return None
-    content = str(message.get("content") or "").strip()
+    raw_content = message.get("content")
+    if isinstance(raw_content, dict):
+        content = str(raw_content.get("text") or "").strip()
+        raw_metadata = raw_content
+    else:
+        content = str(raw_content or "").strip()
+        raw_metadata = message.get("content_metadata")
+    metadata = raw_metadata if isinstance(raw_metadata, dict) else {}
+    mentions = [
+        item for item in (metadata.get("mentions") or []) if isinstance(item, dict)
+    ]
+    elements = [
+        item for item in (metadata.get("elements") or []) if isinstance(item, dict)
+    ]
     message_id = str(message.get("message_id") or "").strip()
     sender_name = str(message.get("sender") or "").strip()
     sender_number = str(message.get("sender_number") or "").strip()
@@ -121,8 +134,8 @@ def _normalize_message(message: dict[str, Any], zone: ZoneInfo) -> dict[str, Any
         },
         "content": {
             "text": content,
-            "mentions": [],
-            "elements": [],
+            "mentions": mentions,
+            "elements": elements,
         },
     }
 

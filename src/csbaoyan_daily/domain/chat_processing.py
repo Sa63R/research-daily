@@ -179,7 +179,9 @@ class AliasResolver:
             return digit_alias, None
 
         escaped_tokens = sorted((re.escape(token) for token in digit_alias), key=len, reverse=True)
-        pattern = re.compile(rf"(?<!\d)(?:{'|'.join(escaped_tokens)})(?!\d)")
+        pattern = re.compile(
+            rf"(?<!User_)(?<!\d)(?:{'|'.join(escaped_tokens)})(?!\d)"
+        )
         return digit_alias, pattern
 
     def sanitize_global(self, text: str) -> str:
@@ -207,6 +209,47 @@ def redact_sensitive_text(text: str) -> str:
     return text
 
 
+def sanitize_structured_mentions(
+    text: str,
+    message: dict[str, Any],
+    resolver: AliasResolver,
+) -> str:
+    """Replace @ targets using metadata supplied by the source adapter.
+
+    QQNT previews concatenate the display name and following text, for
+    example ``@周丽峰全是九``.  Because the source adapter has already
+    identified the exact target, this replacement must not require a textual
+    boundary after the name.
+    """
+
+    content = message.get("content") or {}
+    mentions = [item for item in content.get("mentions") or [] if isinstance(item, dict)]
+    element_mentions = []
+    for element in content.get("elements") or []:
+        if not isinstance(element, dict) or element.get("type") != "at":
+            continue
+        data = element.get("data") or {}
+        if isinstance(data, dict):
+            element_mentions.append(data)
+
+    targets = mentions or element_mentions
+    replacements: list[tuple[str, str]] = []
+    for mention in targets:
+        name = str(mention.get("name") or "").strip()
+        alias = resolver.resolve(mention.get("uid"), mention.get("uin"), name)
+        if not alias:
+            continue
+        token = f"@{name}" if name else "@"
+        replacements.append((token, f"@{alias}"))
+
+    if not replacements:
+        return text
+
+    for token, replacement in replacements:
+        text = text.replace(token, replacement, 1)
+    return text
+
+
 def sanitize_text_core(raw_text: str, message: dict[str, Any], resolver: AliasResolver) -> str:
     text = raw_text.strip()
     if not text:
@@ -215,9 +258,9 @@ def sanitize_text_core(raw_text: str, message: dict[str, Any], resolver: AliasRe
     local_replacements = build_message_replacements(message, resolver)
     text = normalize_media_placeholders(text)
     text = redact_sensitive_text(text)
+    text = sanitize_structured_mentions(text, message, resolver)
     text = resolver.sanitize_global(text)
     text = apply_token_replacements(text, local_replacements)
-    text = re.sub(r"@(?:[^\n@\]]{0,96}?)(User_\d+)", r"@\1", text)
     return text
 
 
@@ -339,7 +382,11 @@ def apply_token_replacements(text: str, replacements: dict[str, str]) -> str:
 
 def replace_token(text: str, token: str, alias: str) -> str:
     if token.isdigit():
-        return re.sub(rf"(?<!\d){re.escape(token)}(?!\d)", alias, text)
+        return re.sub(
+            rf"(?<!User_)(?<!\d){re.escape(token)}(?!\d)",
+            alias,
+            text,
+        )
 
     return re.sub(
         rf"(?<![{TOKEN_BOUNDARY_CLASS}])"
