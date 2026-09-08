@@ -22,6 +22,9 @@ if [[ "$repo_root" == *['&<>']* || "$python_command" == *['&<>']* ]]; then
 fi
 
 mkdir -p "$(dirname "$target")" "${repo_root}/logs"
+chmod 700 "${repo_root}/logs"
+touch "${repo_root}/logs/launchd.out.log" "${repo_root}/logs/launchd.err.log"
+chmod 600 "${repo_root}/logs/launchd.out.log" "${repo_root}/logs/launchd.err.log"
 temporary="${target}.tmp"
 sed \
     -e "s|__REPO_ROOT__|${repo_root}|g" \

@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .file_utils import write_private_text
+
 
 TOKEN_BOUNDARY_CLASS = r"A-Za-z0-9_\u4e00-\u9fff"
 PERSON_TITLE_SUFFIXES = (
@@ -424,4 +426,4 @@ def chunk_messages(
 
 def write_anonymized_transcript(messages: list[AnonymizedMessage], output_path: Path) -> None:
     content = "\n".join(message.to_line() for message in messages) + "\n"
-    output_path.write_text(content, encoding="utf-8")
+    write_private_text(output_path, content)

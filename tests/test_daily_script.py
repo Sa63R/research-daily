@@ -11,6 +11,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 class DailyPipelineScriptTests(unittest.TestCase):
     def test_macos_bash_accepts_no_forwarded_pipeline_arguments(self) -> None:
         script = (REPO_ROOT / "scripts/daily_pipeline.sh").read_text(encoding="utf-8")
+        self.assertIn("umask 077", script)
         self.assertIn("if [[ ${pipeline_args+x} ]]", script)
 
         result = subprocess.run(

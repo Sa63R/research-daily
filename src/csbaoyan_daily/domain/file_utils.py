@@ -10,6 +10,8 @@ from typing import Any
 
 DATE_PATTERN = re.compile(r"(\d{4}-\d{2}-\d{2})T")
 REPORT_FILE_PATTERN = re.compile(r"^(\d{4}-\d{2}-\d{2})\.md$")
+PRIVATE_DIRECTORY_MODE = 0o700
+PRIVATE_FILE_MODE = 0o600
 
 
 def validate_report_date(value: str) -> str:
@@ -97,14 +99,26 @@ def infer_report_date(payload: dict[str, Any], export_file: Path) -> str:
     return time.strftime("%Y-%m-%d")
 
 
+def ensure_private_directory(path: Path) -> None:
+    path.mkdir(parents=True, exist_ok=True)
+    path.chmod(PRIVATE_DIRECTORY_MODE)
+
+
+def write_private_text(path: Path, content: str) -> None:
+    ensure_private_directory(path.parent)
+    path.write_text(content, encoding="utf-8")
+    path.chmod(PRIVATE_FILE_MODE)
+
+
 def prepare_output_paths(report_dir: Path, report_date: str) -> tuple[Path, Path, Path]:
     internal_dir = report_dir.parent
     extracted_dir = internal_dir / "extracted"
     reports_dir = report_dir
     transcripts_dir = internal_dir / "transcripts"
-    extracted_dir.mkdir(parents=True, exist_ok=True)
-    reports_dir.mkdir(parents=True, exist_ok=True)
-    transcripts_dir.mkdir(parents=True, exist_ok=True)
+    ensure_private_directory(internal_dir)
+    ensure_private_directory(extracted_dir)
+    ensure_private_directory(reports_dir)
+    ensure_private_directory(transcripts_dir)
     extracted_path = extracted_dir / f"{report_date}.md"
     report_path = reports_dir / f"{report_date}.md"
     transcript_path = transcripts_dir / f"{report_date}.txt"

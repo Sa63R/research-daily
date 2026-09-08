@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from .chat_processing import ChatChunk
+from .file_utils import write_private_text
 
 
 EXTRACTION_SYSTEM_PROMPT = """你是一名熟悉“保研/夏令营/预推免/联系导师/实验室招生”语境的信息编辑。
@@ -152,12 +153,12 @@ def extract_all_chunks(
                 results.append(future.result())
 
     results.sort(key=lambda item: item[0])
-    extracted_path.write_text(
+    write_private_text(
+        extracted_path,
         "".join(
             f"# Chunk {chunk_index}\n\n- 时间范围：{start_time} - {end_time}\n\n{summary}\n\n"
             for chunk_index, start_time, end_time, summary in results
         ),
-        encoding="utf-8",
     )
 
 
@@ -195,4 +196,4 @@ def generate_final_report(
     )
 
     sanitized_report = sanitize_report_text(report.strip())
-    final_report_path.write_text(sanitized_report + "\n", encoding="utf-8")
+    write_private_text(final_report_path, sanitized_report + "\n")
