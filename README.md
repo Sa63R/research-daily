@@ -12,8 +12,8 @@ CS（Computer Science）保研群（[绿群](https://github.com/CS-BAOYAN)）每
 
 1. 调用本机 `qqnt-export-macos export-chatlab`，导出目标自然日的 ChatLab JSON；
 2. 读取 ChatLab JSON，对发送者、联系方式和链接进行匿名化；
-3. 用 OpenAI 兼容 API 分块提取并生成 Markdown 日报；
-4. 对最终报告执行隐私风险检查；
+3. 用 OpenAI 兼容 API 将分块聊天提取为带证据编号的结构化候选信息；
+4. 合并候选信息并确定性渲染四板块 Markdown 日报，再执行结构与隐私风险检查；
 5. 上传 `reports/YYYY-MM-DD.md` 到 R2，再刷新 `reports.json`；
 6. 可选发送 Telegram 概览。
 
@@ -39,6 +39,21 @@ chmod 600 .env
 - `QQNT_EXPORT_COMMAND`、`QQNT_KEY_PATH`、`QQNT_CONVERSATION_ID`
 - `OPENAI_BASE_URL`、`OPENAI_API_KEY`、`OPENAI_MODEL`
 - `R2_ACCOUNT_ID`、`R2_ACCESS_KEY_ID`、`R2_SECRET_ACCESS_KEY`
+
+可选设置 `OPENAI_FINAL_MODEL`，让跨 Chunk 合并使用质量更高的模型；未设置时与 `OPENAI_MODEL` 相同。
+默认每个分块最多输出 6000 tokens、每个终稿板块最多输出 12000 tokens；`--timeout` 与 `--final-timeout` 是覆盖重试和退避等待的单次结构化编辑总耗时上限，可通过同名 CLI 参数调整。终稿按最多两个板块并行独立编辑，通过校验的板块会保存为私有缓存，再由程序合并并整体验证。
+对强制推理且默认推理强度过高的已知模型，编辑器会使用较低推理强度，把输出预算优先留给最终 JSON；所有结构约束仍由本地校验器执行。
+
+## 日报结构
+
+新生成的日报固定包含四个板块：
+
+1. **今日值得关注**：按“院校与项目”“申请与考核”“经验与选择”最多三个类别整理高价值内容，不要求读者立即行动；
+2. **今日讨论脉络**：按时间顺序详细概括有内容的话题，包括讨论焦点、关键观点、分歧或阶段性结论；
+3. **传闻与待核实**：单一信源、相互矛盾、仅有提问或缺少原始证据的消息；
+4. **轻松一刻**：少量脱离上下文仍能理解、且不会伤害具体个人的有趣片段。
+
+分块提取结果保存为私有 JSON。最终 Markdown 由程序渲染，模型输出中的证据编号仅用于内部校验，不会公开。
 
 QQ 桥接的安装和 key 获取请参考 [qqnt-export-macos 文档](https://github.com/jielosc/qqnt-export-macos)。R2 部署、历史迁移和定时任务见[部署指南](./docs/deploy-guide.md)。
 

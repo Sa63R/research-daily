@@ -7,25 +7,33 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-OVERVIEW_SECTION_PATTERN = re.compile(r"##\s*今日概览\s*\n+([\s\S]*?)(?=\n##\s|$)")
+PREVIEW_SECTION_PATTERNS = (
+    re.compile(r"##\s*今日值得关注\s*\n+([\s\S]*?)(?=\n##\s|$)"),
+    # Keep old reports usable when manually broadcasting historical dates.
+    re.compile(r"##\s*今日概览\s*\n+([\s\S]*?)(?=\n##\s|$)"),
+)
 
 
 def extract_overview(markdown_text: str) -> str:
-    match = OVERVIEW_SECTION_PATTERN.search(markdown_text)
+    match = None
+    for pattern in PREVIEW_SECTION_PATTERNS:
+        match = pattern.search(markdown_text)
+        if match:
+            break
     if not match:
-        raise ValueError("日报中缺少“今日概览”章节。")
+        raise ValueError("日报中缺少“今日值得关注”或“今日概览”章节。")
 
     lines = match.group(1).splitlines()
     for raw_line in lines:
         line = raw_line.strip()
-        if not line or line.startswith(">"):
+        if not line or line.startswith(">") or line.startswith("#"):
             continue
         line = re.sub(r"^([-+*]|\d+[.)])\s+", "", line)
         line = re.sub(r"[`*_#]+", "", line)
         if line:
             return line
 
-    raise ValueError("“今日概览”章节为空，无法构造 Telegram 播报。")
+    raise ValueError("日报预览章节为空，无法构造 Telegram 播报。")
 
 
 def build_report_url(site_base_url: str, report_date: str) -> str:

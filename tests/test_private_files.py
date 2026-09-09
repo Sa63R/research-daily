@@ -19,6 +19,7 @@ class PrivateFileTests(unittest.TestCase):
                 internal_dir / "reports",
                 "2026-09-07",
             )
+            self.assertEqual(extracted.name, "2026-09-07.json")
             for directory in (
                 internal_dir,
                 extracted.parent,

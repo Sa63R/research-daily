@@ -16,6 +16,7 @@ from .config import (
     EXPORT_DIR,
     OPENAI_API_KEY,
     OPENAI_BASE_URL,
+    OPENAI_FINAL_MODEL,
     OPENAI_MODEL,
     QQNT_ACCOUNT,
     QQNT_CACHE_DIR,
@@ -56,12 +57,19 @@ def add_generate_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--qq-account", default=QQNT_ACCOUNT)
     parser.add_argument("--qq-conversation", default=QQNT_CONVERSATION_ID)
     parser.add_argument("--model", default=OPENAI_MODEL, help="OpenAI-compatible model name.")
+    parser.add_argument(
+        "--final-model",
+        default=OPENAI_FINAL_MODEL,
+        help="Optional stronger model for final consolidation; defaults to --model.",
+    )
     parser.add_argument("--chunk-max-chars", type=int, default=30000)
     parser.add_argument("--chunk-max-messages", type=int, default=600)
     parser.add_argument("--chunk-overlap-messages", type=int, default=30)
     parser.add_argument("--retries", type=int, default=3)
     parser.add_argument("--timeout", type=float, default=120.0)
     parser.add_argument("--final-timeout", type=float, default=300.0)
+    parser.add_argument("--chunk-max-output-tokens", type=int, default=6000)
+    parser.add_argument("--final-max-output-tokens", type=int, default=12000)
     parser.add_argument("--temperature", type=float, default=0.2)
     parser.add_argument("--max-workers", type=int, default=4)
     parser.add_argument("--base-url", default=OPENAI_BASE_URL)
@@ -82,12 +90,15 @@ def _generate_options(args: argparse.Namespace) -> GenerateOptions:
         qq_account=args.qq_account,
         qq_conversation_id=args.qq_conversation,
         model=args.model,
+        final_model=args.final_model,
         chunk_max_chars=args.chunk_max_chars,
         chunk_max_messages=args.chunk_max_messages,
         chunk_overlap_messages=args.chunk_overlap_messages,
         retries=args.retries,
         timeout=args.timeout,
         final_timeout=args.final_timeout,
+        chunk_max_output_tokens=args.chunk_max_output_tokens,
+        final_max_output_tokens=args.final_max_output_tokens,
         temperature=args.temperature,
         max_workers=args.max_workers,
         base_url=args.base_url,

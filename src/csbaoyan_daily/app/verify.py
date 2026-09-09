@@ -14,6 +14,17 @@ PHONE_PATTERN = re.compile(r"(?<!\d)(?:\+?86[- ]?)?1[3-9]\d{9}(?!\d)")
 CONTACT_ID_PATTERN = re.compile(r"(?i)\b(?:qq|vx|wechat|weixin|微信)[:： ]*[A-Za-z0-9_-]{5,}\b")
 CORRUPTED_ALIAS_PATTERN = re.compile(r"User_\d+(?:学院|实验室|学校|大学|系|中心|研究院|平台)")
 RISKY_WORD_PATTERN = re.compile(r"避雷|坑导|黑奴|高压|恶心|压榨")
+REPORT_SCHEMA_PATTERN = re.compile(r"<!--\s*report-schema:\s*2\s*-->")
+TIMELINE_HEADING_PATTERN = re.compile(
+    r"^###\s+(?:[01]\d|2[0-3]):[0-5]\d–(?:[01]\d|2[0-3]):[0-5]\d｜.+$",
+    re.MULTILINE,
+)
+REQUIRED_V2_SECTIONS = (
+    "## 今日值得关注",
+    "## 今日讨论脉络",
+    "## 传闻与待核实",
+    "## 轻松一刻",
+)
 
 
 def scan_text(path: Path, text: str, repo_root: Path) -> list[str]:
@@ -34,6 +45,23 @@ def scan_text(path: Path, text: str, repo_root: Path) -> list[str]:
         match = pattern.search(text)
         if match:
             issues.append(f"{display_path}: {label}: {match.group(0)}")
+
+    if REPORT_SCHEMA_PATTERN.search(text):
+        positions = [text.find(section) for section in REQUIRED_V2_SECTIONS]
+        for section, position in zip(REQUIRED_V2_SECTIONS, positions, strict=True):
+            if position < 0:
+                issues.append(f"{display_path}: missing report section: {section}")
+        present_positions = [position for position in positions if position >= 0]
+        if present_positions != sorted(present_positions):
+            issues.append(f"{display_path}: report sections are out of order")
+
+        timeline_start = text.find("## 今日讨论脉络")
+        uncertain_start = text.find("## 传闻与待核实")
+        if timeline_start >= 0 and uncertain_start > timeline_start:
+            timeline_text = text[timeline_start:uncertain_start]
+            empty_timeline = "今天没有形成适合单独整理的连续讨论" in timeline_text
+            if not empty_timeline and not TIMELINE_HEADING_PATTERN.search(timeline_text):
+                issues.append(f"{display_path}: timeline has no detailed time-range entry")
     return issues
 
 

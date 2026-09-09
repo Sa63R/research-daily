@@ -38,6 +38,7 @@ QQNT_CONVERSATION_ID = os.getenv("QQNT_CONVERSATION_ID", "").strip()
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL")
+OPENAI_FINAL_MODEL = os.getenv("OPENAI_FINAL_MODEL")
 
 # Telegram broadcast config
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")

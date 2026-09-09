@@ -9,6 +9,22 @@ from csbaoyan_daily.infra.telegram import build_report_url, compose_message, ext
 
 
 class ExtractOverviewTests(unittest.TestCase):
+    def test_extract_overview_uses_first_high_value_item_not_category_heading(self) -> None:
+        markdown = """# CS保研信息日报
+
+## 今日值得关注
+
+### 院校与项目
+
+- **某学院项目更新**：群友分享了一项值得关注的项目变化。
+
+## 今日讨论脉络
+"""
+
+        overview = extract_overview(markdown)
+
+        self.assertEqual(overview, "某学院项目更新：群友分享了一项值得关注的项目变化。")
+
     def test_extract_overview_returns_first_non_quote_paragraph(self) -> None:
         markdown = """# CS保研信息日报
 

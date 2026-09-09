@@ -8,6 +8,49 @@ from csbaoyan_daily.domain.chat_processing import anonymize_messages
 
 
 class ChatProcessingTests(unittest.TestCase):
+    def test_noise_is_filtered_and_message_refs_remain_stable(self) -> None:
+        messages = [
+            {
+                "id": "normal",
+                "time": "2026-09-07 08:00:00",
+                "message_type": 0,
+                "sender": {"uid": "12", "uin": "12", "name": "12"},
+                "content": {"text": "12点开始讨论", "mentions": [], "elements": []},
+            },
+            {
+                "id": "system",
+                "time": "2026-09-07 08:01:00",
+                "message_type": "81",
+                "sender": {"uid": "99", "uin": "99", "name": "系统"},
+                "content": {"text": "某人加入了群聊", "mentions": [], "elements": []},
+            },
+            {
+                "id": "image",
+                "time": "2026-09-07 08:02:00",
+                "message_type": 1,
+                "sender": {"uid": "3", "uin": "3", "name": "图片发送者"},
+                "content": {"text": "[图片：截图]", "mentions": [], "elements": []},
+            },
+            {
+                "id": "mixed",
+                "time": "2026-09-07 08:03:00",
+                "message_type": 0,
+                "sender": {"uid": "4", "uin": "4", "name": "群友"},
+                "content": {
+                    "text": "请看[消息类型 1]这个通知",
+                    "mentions": [],
+                    "elements": [],
+                },
+            },
+        ]
+
+        anonymized = anonymize_messages(messages)
+
+        self.assertEqual([message.ref for message in anonymized], ["M00001", "M00002"])
+        self.assertEqual(anonymized[0].text, "12点开始讨论")
+        self.assertEqual(anonymized[1].text, "请看这个通知")
+        self.assertTrue(anonymized[0].to_line().startswith("[M00001] [2026-09-07 08:00:00]"))
+
     def test_structured_mention_replacement_handles_adjacent_chinese_text(self) -> None:
         messages = [
             {

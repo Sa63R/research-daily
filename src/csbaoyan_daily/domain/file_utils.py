@@ -274,7 +274,7 @@ def prepare_output_paths(report_dir: Path, report_date: str) -> tuple[Path, Path
     ensure_private_directory(extracted_dir)
     ensure_private_directory(reports_dir)
     ensure_private_directory(transcripts_dir)
-    extracted_path = extracted_dir / f"{report_date}.md"
+    extracted_path = extracted_dir / f"{report_date}.json"
     report_path = reports_dir / f"{report_date}.md"
     transcript_path = transcripts_dir / f"{report_date}.txt"
     return extracted_path, report_path, transcript_path

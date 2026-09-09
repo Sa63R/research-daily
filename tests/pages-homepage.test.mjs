@@ -24,6 +24,7 @@ assert.match(appJs, /function\s+showHomeView\s*\(/, "app.js should render the no
 assert.match(appJs, /function\s+showReaderView\s*\(/, "app.js should render the report reader state");
 assert.match(appJs, /function\s+renderHomeView\s*\(/, "app.js should populate homepage data from the manifest");
 assert.match(appJs, /function\s+extractOverview\s*\(/, "app.js should extract overview text from report markdown");
+assert.match(appJs, /今日值得关注/, "app.js should preview the new high-value section");
 assert.match(appJs, /function\s+loadRecentReportSummaries\s*\(/, "app.js should load recent report summaries for the homepage");
 assert.match(appJs, /function\s+dataUrl\s*\(/, "app.js should resolve all report URLs through R2");
 assert.match(appJs, /function\s+normalizeManifest\s*\(/, "app.js should reject malformed manifest entries");

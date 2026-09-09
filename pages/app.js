@@ -146,7 +146,9 @@ function formatHomeDate(date) {
 }
 
 function extractOverview(markdownText) {
-  const match = markdownText.match(/##\s*今日概览\s*\n+([\s\S]*?)(?=\n##\s|$)/);
+  const match = ["今日值得关注", "今日概览"]
+    .map((section) => markdownText.match(new RegExp(`##\\s*${section}\\s*\\n+([\\s\\S]*?)(?=\\n##\\s|$)`)))
+    .find(Boolean);
   if (!match) {
     return "本期概览暂不可用，点击查看日报正文。";
   }
@@ -154,7 +156,7 @@ function extractOverview(markdownText) {
   const overview = match[1]
     .split(/\n+/)
     .map((line) => line.trim())
-    .find((line) => line && !line.startsWith(">"));
+    .find((line) => line && !line.startsWith(">") && !line.startsWith("#"));
 
   if (!overview) {
     return "本期概览暂不可用，点击查看日报正文。";

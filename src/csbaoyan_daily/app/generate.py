@@ -9,6 +9,7 @@ from ..config import (
     EXPORT_DIR,
     OPENAI_API_KEY,
     OPENAI_BASE_URL,
+    OPENAI_FINAL_MODEL,
     OPENAI_MODEL,
     QQNT_ACCOUNT,
     QQNT_CACHE_DIR,
@@ -56,12 +57,15 @@ class GenerateOptions:
     qq_account: str | None = QQNT_ACCOUNT
     qq_conversation_id: str = QQNT_CONVERSATION_ID
     model: str | None = OPENAI_MODEL
+    final_model: str | None = OPENAI_FINAL_MODEL
     chunk_max_chars: int = 30000
     chunk_max_messages: int = 600
     chunk_overlap_messages: int = 30
     retries: int = 3
     timeout: float = 120.0
     final_timeout: float = 300.0
+    chunk_max_output_tokens: int = 6000
+    final_max_output_tokens: int = 12000
     temperature: float = 0.2
     max_workers: int = 4
     base_url: str | None = OPENAI_BASE_URL
@@ -125,9 +129,12 @@ def run_generate_report(options: GenerateOptions) -> GenerateArtifacts:
         max_messages=options.chunk_max_messages,
         overlap_messages=options.chunk_overlap_messages,
     )
-    model = str(options.model or "").strip()
-    if not model:
+    extraction_model = str(options.model or "").strip()
+    final_model = str(options.final_model or options.model or "").strip()
+    if not extraction_model:
         raise ValueError("缺少模型名称。请设置 OPENAI_MODEL 或通过 --model 传入。")
+    if not final_model:
+        raise ValueError("缺少最终汇总模型名称。请设置 OPENAI_FINAL_MODEL 或 OPENAI_MODEL。")
 
     extracted_path, report_path, transcript_path = prepare_output_paths(report_dir, target_date)
     write_anonymized_transcript(anonymized_messages, transcript_path)
@@ -142,26 +149,41 @@ def run_generate_report(options: GenerateOptions) -> GenerateArtifacts:
             target_date,
             inferred_report_date,
         )
-    logging.info("脱敏后消息数：%s，Chunk 数：%s", len(anonymized_messages), len(chunks))
+    logging.info(
+        "原始消息数：%s，清洗脱敏后消息数：%s，Chunk 数：%s",
+        len(messages),
+        len(anonymized_messages),
+        len(chunks),
+    )
+    logging.info("模型设置：分块提取 %s，最终汇总 %s", extraction_model, final_model)
     logging.info("LLM 超时设置：分块提取 %ss，最终汇总 %ss", options.timeout, options.final_timeout)
+    logging.info(
+        "LLM 输出上限：分块提取 %s tokens，最终汇总 %s tokens",
+        options.chunk_max_output_tokens,
+        options.final_max_output_tokens,
+    )
 
     extract_all_chunks(
         chunks=chunks,
         extracted_path=extracted_path,
         client=extraction_client,
-        model=model,
+        model=extraction_model,
         retries=options.retries,
         temperature=options.temperature,
         max_workers=options.max_workers,
+        max_output_tokens=options.chunk_max_output_tokens,
+        deadline_seconds=options.timeout,
     )
 
     generate_final_report(
         extracted_path=extracted_path,
         final_report_path=report_path,
         client=final_client,
-        model=model,
+        model=final_model,
         retries=options.retries,
         temperature=options.temperature,
+        max_output_tokens=options.final_max_output_tokens,
+        deadline_seconds=options.final_timeout,
     )
 
     logging.info("中间提取结果：%s", extracted_path)

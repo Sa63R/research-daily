@@ -30,6 +30,17 @@ URL_PATTERN = re.compile(
 PHONE_PATTERN = re.compile(r"(?<!\d)(?:\+?86[- ]?)?1[3-9]\d{9}(?!\d)")
 CONTACT_ID_PATTERN = re.compile(r"(?i)\b(?:qq|vx|wechat|weixin|微信)[:： ]*[A-Za-z0-9_-]{5,}\b")
 PUBLIC_ALIAS_RULES = ()
+SYSTEM_MESSAGE_TYPES = {81, "81"}
+NOISE_MARKER_PATTERN = re.compile(
+    r"\[(?:"
+    r"图片(?:[:：][^\]]*)?|"
+    r"文件(?:[:：][^\]]*)?|"
+    r"语音(?:转写)?(?:[:： ][^\]]*)?|"
+    r"视频(?:[:：][^\]]*)?|"
+    r"表情|动态消息|卡片消息|无法预览|无正文|正文解析失败|附件"
+    r"|链接|红包或转账|系统提示"
+    r")\]"
+)
 
 
 def should_register_suffix_alias(suffix: str) -> bool:
@@ -42,12 +53,14 @@ def should_register_suffix_alias(suffix: str) -> bool:
 
 @dataclass
 class AnonymizedMessage:
+    ref: str
     time: str
     speaker: str
     text: str
 
     def to_line(self) -> str:
-        return f"[{self.time}] {self.speaker}: {self.text}"
+        indented_text = self.text.replace("\n", "\n    ")
+        return f"[{self.ref}] [{self.time}] {self.speaker}: {indented_text}"
 
 
 @dataclass
@@ -172,7 +185,9 @@ class AliasResolver:
     def _build_global_digit_pattern(self) -> tuple[dict[str, str], re.Pattern[str] | None]:
         digit_alias: dict[str, str] = {}
         for token, canonical in self.token_to_canonical.items():
-            if token.isdigit():
+            # QQ/UIN-style identifiers are long. Short numeric nicknames such
+            # as "12" must not corrupt ordinary text like "12点" or "rk10".
+            if token.isdigit() and len(token) >= 5:
                 digit_alias.setdefault(token, self.alias_by_canonical[canonical])
 
         if not digit_alias:
@@ -194,11 +209,21 @@ class AliasResolver:
 
 
 def normalize_media_placeholders(text: str) -> str:
-    text = re.sub(r"\[图片:[^\]]+\]", "[图片]", text)
-    text = re.sub(r"\[语音:[^\]]+\]", "[语音]", text)
-    text = re.sub(r"\[视频:[^\]]+\]", "[视频]", text)
-    text = re.sub(r"\[文件:[^\]]+\]", "[文件]", text)
+    text = re.sub(r"\[图片[:：]\[[^\]]+\]\]", "[图片]", text)
+    text = re.sub(r"\[图片[:：][^\]]+\]", "[图片]", text)
+    text = re.sub(r"\[语音[:：][^\]]+\]", "[语音]", text)
+    text = re.sub(r"\[视频[:：][^\]]+\]", "[视频]", text)
+    text = re.sub(r"\[文件[:：][^\]]+\]", "[文件]", text)
+    # Type-1 placeholders are emitted for QQ elements that carry no readable
+    # text (commonly an @ element). They add noise but no information.
+    text = re.sub(r"\[消息类型 \d+\]", "", text)
     return text
+
+
+def is_noise_only_text(text: str) -> bool:
+    without_known_markers = NOISE_MARKER_PATTERN.sub("", text)
+    without_mentions = re.sub(r"(?:@User_\d+\s*)+", "", without_known_markers)
+    return not without_mentions.strip(" \t\r\n[]")
 
 
 def redact_sensitive_text(text: str) -> str:
@@ -347,6 +372,8 @@ def build_message_replacements(message: dict[str, Any], resolver: AliasResolver)
             text = str(token).strip()
             if not text:
                 continue
+            if text.isdigit() and len(text) < 5:
+                continue
             replacements[text] = alias
 
             if isinstance(token, str) and "-" in text:
@@ -407,7 +434,11 @@ def anonymize_messages(messages: list[dict[str, Any]]) -> list[AnonymizedMessage
     anonymized: list[AnonymizedMessage] = []
 
     for message in messages:
-        if message.get("system") or message.get("recalled"):
+        if (
+            message.get("system")
+            or message.get("recalled")
+            or message.get("message_type") in SYSTEM_MESSAGE_TYPES
+        ):
             continue
 
         sender = message.get("sender") or {}
@@ -421,11 +452,18 @@ def anonymize_messages(messages: list[dict[str, Any]]) -> list[AnonymizedMessage
             continue
 
         text = sanitize_message_text(raw_text, message, resolver, message_index)
-        if not text:
+        if not text or is_noise_only_text(text):
             continue
 
         message_time = str(message.get("time") or "").strip() or "UNKNOWN_TIME"
-        anonymized.append(AnonymizedMessage(time=message_time, speaker=alias, text=text))
+        anonymized.append(
+            AnonymizedMessage(
+                ref=f"M{len(anonymized) + 1:05d}",
+                time=message_time,
+                speaker=alias,
+                text=text,
+            )
+        )
 
     return anonymized
 
