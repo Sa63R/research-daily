@@ -18,6 +18,7 @@ from .config import (
     OPENAI_BASE_URL,
     OPENAI_FINAL_MODEL,
     OPENAI_MODEL,
+    OPENROUTER_PROVIDER_ORDER,
     QQNT_ACCOUNT,
     QQNT_CACHE_DIR,
     QQNT_CONVERSATION_ID,
@@ -26,6 +27,7 @@ from .config import (
     QQNT_KEY_PATH,
     REPORT_DIR,
     REPORT_TIMEZONE,
+    parse_provider_order,
     resolve_path,
 )
 from .domain.file_utils import validate_report_date
@@ -62,16 +64,22 @@ def add_generate_arguments(parser: argparse.ArgumentParser) -> None:
         default=OPENAI_FINAL_MODEL,
         help="Optional stronger model for final consolidation; defaults to --model.",
     )
-    parser.add_argument("--chunk-max-chars", type=int, default=30000)
-    parser.add_argument("--chunk-max-messages", type=int, default=600)
-    parser.add_argument("--chunk-overlap-messages", type=int, default=30)
+    parser.add_argument(
+        "--provider-order",
+        type=parse_provider_order,
+        default=",".join(OPENROUTER_PROVIDER_ORDER),
+        help="Comma-separated OpenRouter provider slugs; routing is restricted to this ordered list.",
+    )
+    parser.add_argument("--chunk-max-chars", type=int, default=20000)
+    parser.add_argument("--chunk-max-messages", type=int, default=400)
+    parser.add_argument("--chunk-overlap-messages", type=int, default=20)
     parser.add_argument("--retries", type=int, default=3)
-    parser.add_argument("--timeout", type=float, default=120.0)
+    parser.add_argument("--timeout", type=float, default=240.0)
     parser.add_argument("--final-timeout", type=float, default=300.0)
-    parser.add_argument("--chunk-max-output-tokens", type=int, default=6000)
+    parser.add_argument("--chunk-max-output-tokens", type=int, default=3500)
     parser.add_argument("--final-max-output-tokens", type=int, default=12000)
     parser.add_argument("--temperature", type=float, default=0.2)
-    parser.add_argument("--max-workers", type=int, default=4)
+    parser.add_argument("--max-workers", type=int, default=2)
     parser.add_argument("--base-url", default=OPENAI_BASE_URL)
     parser.add_argument("--api-key", default=OPENAI_API_KEY)
 
@@ -91,6 +99,7 @@ def _generate_options(args: argparse.Namespace) -> GenerateOptions:
         qq_conversation_id=args.qq_conversation,
         model=args.model,
         final_model=args.final_model,
+        provider_order=args.provider_order,
         chunk_max_chars=args.chunk_max_chars,
         chunk_max_messages=args.chunk_max_messages,
         chunk_overlap_messages=args.chunk_overlap_messages,

@@ -199,6 +199,36 @@ def _enum(value: Any, field: str, allowed: tuple[str, ...]) -> str:
     return text
 
 
+def _highlight_category(value: Any, field: str) -> str:
+    text = _plain_text(value, field)
+    aliases = {
+        "招生动态": "院校与项目",
+        "院校动态": "院校与项目",
+        "项目动态": "院校与项目",
+        "申请经验": "申请与考核",
+        "考核经验": "申请与考核",
+        "申请流程": "申请与考核",
+        "选择分析": "经验与选择",
+        "经验分享": "经验与选择",
+        "培养体验": "经验与选择",
+    }
+    return _enum(aliases.get(text, text), field, HIGHLIGHT_CATEGORIES)
+
+
+def _highlight_kind(value: Any, field: str) -> str:
+    text = _plain_text(value, field)
+    aliases = {
+        "信息": "动态",
+        "通知": "动态",
+        "经历": "经验",
+        "体验": "经验",
+        "观察": "分析",
+        "观点": "分析",
+        "建议": "分析",
+    }
+    return _enum(aliases.get(text, text), field, HIGHLIGHT_KINDS)
+
+
 def _evidence_refs(
     value: Any,
     field: str,
@@ -239,9 +269,12 @@ def _string_list(
 
 def _time(value: Any, field: str) -> str:
     text = _plain_text(value, field)
-    if not TIME_PATTERN.fullmatch(text):
-        raise ValueError(f"字段 {field} 必须使用 HH:MM 格式。")
-    return text
+    if TIME_PATTERN.fullmatch(text):
+        return text
+    match = re.search(r"(?<!\d)((?:[01]\d|2[0-3]):[0-5]\d)(?::[0-5]\d)?(?!\d)", text)
+    if match:
+        return match.group(1)[:5]
+    raise ValueError(f"字段 {field} 必须使用 HH:MM 格式。")
 
 
 def _looks_like_question(text: str) -> bool:
@@ -283,10 +316,9 @@ def normalize_report_payload(
             allowed_role_refs=high_refs,
         )
         normalized = {
-            "category": _enum(
+            "category": _highlight_category(
                 item.get("category"),
                 f"high_value[{index}].category",
-                HIGHLIGHT_CATEGORIES,
             ),
             "title": _plain_text(item.get("title"), f"high_value[{index}].title"),
             "summary": _plain_text(
@@ -294,10 +326,9 @@ def normalize_report_payload(
                 f"high_value[{index}].summary",
                 minimum=8,
             ),
-            "kind": _enum(
+            "kind": _highlight_kind(
                 item.get("kind"),
                 f"high_value[{index}].kind",
-                HIGHLIGHT_KINDS,
             ),
             "confidence": _enum(
                 item.get("confidence"),

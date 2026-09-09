@@ -7,13 +7,16 @@ import time
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
+from csbaoyan_daily.domain.chat_processing import AnonymizedMessage, ChatChunk
 from csbaoyan_daily.domain.report_generation import (
     call_structured_llm_with_retry,
     compact_extracted_payload,
     generate_final_report,
+    summarize_chunk_resilient,
 )
 
 
@@ -259,6 +262,67 @@ class ReportGenerationTests(unittest.TestCase):
             {"reasoning": {"effort": "low", "exclude": True}},
         )
 
+    def test_structured_call_uses_configured_provider_allowlist(self) -> None:
+        client, completions = fake_client([json.dumps({"ok": True})])
+
+        call_structured_llm_with_retry(
+            client=client,
+            model="z-ai/glm-5.3-flash",
+            system_prompt="system",
+            user_prompt="user",
+            retries=1,
+            temperature=0.2,
+            response_format={"type": "json_object"},
+            validator=json.loads,
+            provider_order=("z-ai", "deepinfra"),
+        )
+
+        self.assertEqual(
+            completions.requests[0]["extra_body"],
+            {
+                "provider": {
+                    "order": ["z-ai", "deepinfra"],
+                    "only": ["z-ai", "deepinfra"],
+                },
+            },
+        )
+
+    def test_resilient_chunk_splits_and_merges_after_failure(self) -> None:
+        messages = [
+            AnonymizedMessage(
+                ref=f"M{index:05d}",
+                time=f"2026-09-08 08:{index % 60:02d}:00",
+                speaker="User_1",
+                text=f"消息 {index}",
+            )
+            for index in range(1, 101)
+        ]
+        chunk = ChatChunk(index=3, messages=messages)
+        empty = {
+            "high_value": [],
+            "timeline_topics": [],
+            "uncertain": [],
+            "light_moments": [],
+        }
+
+        with patch(
+            "csbaoyan_daily.domain.report_generation.summarize_chunk",
+            side_effect=[RuntimeError("timeout"), (3, "a", "b", empty), (3, "c", "d", empty)],
+        ) as summarize:
+            result = summarize_chunk_resilient(
+                chunk=chunk,
+                client=object(),
+                model="test-model",
+                retries=1,
+                temperature=0.2,
+                max_output_tokens=100,
+                deadline_seconds=10,
+            )
+
+        self.assertEqual(summarize.call_count, 3)
+        self.assertEqual(result[:3], (3, chunk.start_time, chunk.end_time))
+        self.assertEqual(result[3], empty)
+
     def test_structured_call_enforces_total_wall_clock_deadline(self) -> None:
         class SlowCompletions:
             def __init__(self) -> None:
@@ -275,7 +339,7 @@ class ReportGenerationTests(unittest.TestCase):
         client = SimpleNamespace(chat=SimpleNamespace(completions=completions))
         started = time.monotonic()
 
-        with self.assertRaisesRegex(RuntimeError, "总耗时上限"):
+        with self.assertRaisesRegex(RuntimeError, "耗时上限"):
             call_structured_llm_with_retry(
                 client=client,
                 model="test-model",
@@ -289,7 +353,7 @@ class ReportGenerationTests(unittest.TestCase):
             )
 
         self.assertLess(time.monotonic() - started, 0.08)
-        self.assertEqual(completions.calls, 1)
+        self.assertGreaterEqual(completions.calls, 2)
 
 
 if __name__ == "__main__":

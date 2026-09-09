@@ -58,9 +58,9 @@ class AnonymizedMessage:
     speaker: str
     text: str
 
-    def to_line(self) -> str:
+    def to_line(self, *, display_time: str | None = None) -> str:
         indented_text = self.text.replace("\n", "\n    ")
-        return f"[{self.ref}] [{self.time}] {self.speaker}: {indented_text}"
+        return f"[{self.ref}] [{display_time or self.time}] {self.speaker}: {indented_text}"
 
 
 @dataclass
@@ -71,6 +71,25 @@ class ChatChunk:
     @property
     def text(self) -> str:
         return "\n".join(message.to_line() for message in self.messages)
+
+    @property
+    def common_date(self) -> str | None:
+        parts = [message.time.split(" ", 1) for message in self.messages]
+        if not parts or any(len(part) != 2 for part in parts):
+            return None
+        dates = {part[0] for part in parts}
+        return next(iter(dates)) if len(dates) == 1 else None
+
+    @property
+    def prompt_text(self) -> str:
+        """Render a same-day chunk without repeating its date on every line."""
+
+        if self.common_date is None:
+            return self.text
+        return "\n".join(
+            message.to_line(display_time=message.time.split(" ", 1)[1])
+            for message in self.messages
+        )
 
     @property
     def start_time(self) -> str:

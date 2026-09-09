@@ -74,6 +74,12 @@ resolve_existing_dir() {
 }
 
 resolve_python_command() {
+    if [[ -n "${GREEN_DAILY_RUNNER:-}" ]]; then
+        local runner_python="${resolved_repo_root}/.venv/bin/python"
+        [[ -x "$runner_python" ]] || die "GreenDailyRunner requires the project virtual environment: $runner_python"
+        printf '%s\n' "$runner_python"
+        return 0
+    fi
     if [[ -n "$python_command" ]]; then
         printf '%s\n' "$python_command"
         return 0

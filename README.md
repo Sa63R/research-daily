@@ -38,11 +38,12 @@ chmod 600 .env
 
 - `QQNT_EXPORT_COMMAND`、`QQNT_KEY_PATH`、`QQNT_CONVERSATION_ID`
 - `OPENAI_BASE_URL`、`OPENAI_API_KEY`、`OPENAI_MODEL`
+- `OPENROUTER_PROVIDER_ORDER`（当前建议为 `z-ai,deepinfra`）
 - `R2_ACCOUNT_ID`、`R2_ACCESS_KEY_ID`、`R2_SECRET_ACCESS_KEY`
 
 可选设置 `OPENAI_FINAL_MODEL`，让跨 Chunk 合并使用质量更高的模型；未设置时与 `OPENAI_MODEL` 相同。
-默认每个分块最多输出 6000 tokens、每个终稿板块最多输出 12000 tokens；`--timeout` 与 `--final-timeout` 是覆盖重试和退避等待的单次结构化编辑总耗时上限，可通过同名 CLI 参数调整。终稿按最多两个板块并行独立编辑，通过校验的板块会保存为私有缓存，再由程序合并并整体验证。
-对强制推理且默认推理强度过高的已知模型，编辑器会使用较低推理强度，把输出预算优先留给最终 JSON；所有结构约束仍由本地校验器执行。
+默认按最多 2 万字符或 400 条消息切分（重叠 20 条），每个分块最多输出 3500 tokens、每个终稿板块最多输出 12000 tokens；`--timeout`（默认 240 秒）与 `--final-timeout`（默认 300 秒）是覆盖重试和退避等待的单次结构化编辑总耗时上限。程序会在多次尝试之间预留预算，避免单个卡住的请求耗尽全部重试时间。分块默认最多 2 路并发，以兼顾吞吐量和模型上游稳定性；终稿也按最多两个板块并行独立编辑，通过校验的板块会保存为私有缓存，再由程序合并并整体验证。
+对强制推理且默认推理强度过高的已知模型，分块提取和终稿编辑都会使用较低推理强度，把输出预算优先留给最终 JSON；所有结构约束仍由本地校验器执行。OpenRouter Provider 顺序由 `OPENROUTER_PROVIDER_ORDER` 配置；例如 `z-ai,deepinfra` 会优先使用 Z.AI，失败时只回退到 DeepInfra，不会落到 Wafer 等名单外端点。留空则使用 OpenRouter 自动路由。
 
 ## 日报结构
 
@@ -56,6 +57,8 @@ chmod 600 .env
 分块提取结果保存为私有 JSON。最终 Markdown 由程序渲染，模型输出中的证据编号仅用于内部校验，不会公开。
 
 QQ 桥接的安装和 key 获取请参考 [qqnt-export-macos 文档](https://github.com/jielosc/qqnt-export-macos)。R2 部署、历史迁移和定时任务见[部署指南](./docs/deploy-guide.md)。
+
+macOS 定时任务通过独立的 `GreenDailyRunner.app` 启动，不需要给 Homebrew 的通用 Python 完全磁盘访问权限。Runner 使用固定 bundle identifier，只执行本项目内固定的日报脚本；安装与授权步骤见部署指南。
 
 ## CLI
 

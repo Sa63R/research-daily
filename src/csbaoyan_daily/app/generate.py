@@ -11,6 +11,7 @@ from ..config import (
     OPENAI_BASE_URL,
     OPENAI_FINAL_MODEL,
     OPENAI_MODEL,
+    OPENROUTER_PROVIDER_ORDER,
     QQNT_ACCOUNT,
     QQNT_CACHE_DIR,
     QQNT_CONVERSATION_ID,
@@ -58,16 +59,17 @@ class GenerateOptions:
     qq_conversation_id: str = QQNT_CONVERSATION_ID
     model: str | None = OPENAI_MODEL
     final_model: str | None = OPENAI_FINAL_MODEL
-    chunk_max_chars: int = 30000
-    chunk_max_messages: int = 600
-    chunk_overlap_messages: int = 30
+    provider_order: tuple[str, ...] = OPENROUTER_PROVIDER_ORDER
+    chunk_max_chars: int = 20000
+    chunk_max_messages: int = 400
+    chunk_overlap_messages: int = 20
     retries: int = 3
-    timeout: float = 120.0
+    timeout: float = 240.0
     final_timeout: float = 300.0
-    chunk_max_output_tokens: int = 6000
+    chunk_max_output_tokens: int = 3500
     final_max_output_tokens: int = 12000
     temperature: float = 0.2
-    max_workers: int = 4
+    max_workers: int = 2
     base_url: str | None = OPENAI_BASE_URL
     api_key: str | None = OPENAI_API_KEY
 
@@ -156,6 +158,8 @@ def run_generate_report(options: GenerateOptions) -> GenerateArtifacts:
         len(chunks),
     )
     logging.info("模型设置：分块提取 %s，最终汇总 %s", extraction_model, final_model)
+    if options.provider_order:
+        logging.info("OpenRouter Provider 顺序：%s", " -> ".join(options.provider_order))
     logging.info("LLM 超时设置：分块提取 %ss，最终汇总 %ss", options.timeout, options.final_timeout)
     logging.info(
         "LLM 输出上限：分块提取 %s tokens，最终汇总 %s tokens",
@@ -173,6 +177,7 @@ def run_generate_report(options: GenerateOptions) -> GenerateArtifacts:
         max_workers=options.max_workers,
         max_output_tokens=options.chunk_max_output_tokens,
         deadline_seconds=options.timeout,
+        provider_order=options.provider_order,
     )
 
     generate_final_report(
@@ -184,6 +189,7 @@ def run_generate_report(options: GenerateOptions) -> GenerateArtifacts:
         temperature=options.temperature,
         max_output_tokens=options.final_max_output_tokens,
         deadline_seconds=options.final_timeout,
+        provider_order=options.provider_order,
     )
 
     logging.info("中间提取结果：%s", extracted_path)

@@ -13,6 +13,17 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if load_dotenv is not None:
     load_dotenv(REPO_ROOT / ".env")
 
+
+def parse_provider_order(value: str | None) -> tuple[str, ...]:
+    """Parse an ordered, de-duplicated provider allowlist."""
+
+    providers: list[str] = []
+    for candidate in (value or "").split(","):
+        provider = candidate.strip()
+        if provider and provider not in providers:
+            providers.append(provider)
+    return tuple(providers)
+
 # Local paths
 EXPORT_DIR = Path(os.getenv("CSBAOYAN_EXPORT_DIR", "chat_exports"))
 REPORT_DIR = Path(os.getenv("CSBAOYAN_REPORT_DIR", "internal/reports"))
@@ -39,6 +50,9 @@ OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL")
 OPENAI_FINAL_MODEL = os.getenv("OPENAI_FINAL_MODEL")
+OPENROUTER_PROVIDER_ORDER = parse_provider_order(
+    os.getenv("OPENROUTER_PROVIDER_ORDER")
+)
 
 # Telegram broadcast config
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")

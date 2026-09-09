@@ -6,12 +6,7 @@
   <string>com.jielosc.csbaoyan-daily</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/bin/bash</string>
-    <string>__REPO_ROOT__/scripts/daily_pipeline.sh</string>
-    <string>--repo-root</string>
-    <string>__REPO_ROOT__</string>
-    <string>--python-command</string>
-    <string>__PYTHON_COMMAND__</string>
+    <string>__RUNNER_EXECUTABLE__</string>
   </array>
   <key>WorkingDirectory</key>
   <string>__REPO_ROOT__</string>

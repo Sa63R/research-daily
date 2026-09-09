@@ -4,10 +4,40 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from csbaoyan_daily.domain.chat_processing import anonymize_messages
+from csbaoyan_daily.domain.chat_processing import (
+    AnonymizedMessage,
+    ChatChunk,
+    anonymize_messages,
+)
 
 
 class ChatProcessingTests(unittest.TestCase):
+    def test_same_day_chunk_repeats_date_only_in_chunk_context(self) -> None:
+        chunk = ChatChunk(
+            index=1,
+            messages=[
+                AnonymizedMessage("M00001", "2026-09-08 08:01:02", "User_1", "消息一"),
+                AnonymizedMessage("M00002", "2026-09-08 08:03:04", "User_2", "消息二"),
+            ],
+        )
+
+        self.assertEqual(chunk.common_date, "2026-09-08")
+        self.assertIn("[M00001] [08:01:02]", chunk.prompt_text)
+        self.assertNotIn("2026-09-08", chunk.prompt_text)
+        self.assertIn("2026-09-08", chunk.text)
+
+    def test_cross_day_chunk_keeps_full_timestamps(self) -> None:
+        chunk = ChatChunk(
+            index=1,
+            messages=[
+                AnonymizedMessage("M00001", "2026-09-08 23:59:59", "User_1", "消息一"),
+                AnonymizedMessage("M00002", "2026-09-09 00:00:01", "User_2", "消息二"),
+            ],
+        )
+
+        self.assertIsNone(chunk.common_date)
+        self.assertEqual(chunk.prompt_text, chunk.text)
+
     def test_noise_is_filtered_and_message_refs_remain_stable(self) -> None:
         messages = [
             {
