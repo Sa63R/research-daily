@@ -4,10 +4,10 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>绿群日报</title>
-  <meta name="description" content="按日期浏览保研信息日报，默认显示最新一期，支持静态部署到 GitHub Pages。" />
-  <meta property="og:title" content="绿群日报 - CS Baoyan Chat Daily" />
-  <meta property="og:description" content="每日 AI 总结绿群信息，打破 CS 保研信息差。" />
+  <title>绿群日报 · 历史预览</title>
+  <meta name="description" content="CS Baoyan Chat Daily Generator 的历史生成效果预览，内容已停止每日更新。" />
+  <meta property="og:title" content="绿群日报历史预览 - CS Baoyan Chat Daily Generator" />
+  <meta property="og:description" content="浏览日报生成工具过去生成的示例；内容已停止每日更新。" />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://csbaoyan.icelon.top/" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📰</text></svg>" />
@@ -30,10 +30,10 @@
   <div class="site-shell">
     <header class="hero">
       <a class="hero-copy hero-home-link" id="home-link" href="./" aria-label="回到主页">
-        <p class="eyebrow">CS Baoyan Chat Daily</p>
-        <h1>绿群日报</h1>
+        <p class="eyebrow">CS Baoyan Chat Daily Generator</p>
+        <h1>绿群日报历史预览</h1>
         <p class="hero-summary">
-          绿群保研信息提炼：帮你每日快速跟进
+          日报生成工具的历史输出展示
         </p>
       </a>
       <div class="hero-status">
@@ -51,7 +51,7 @@
           <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
             <path d="M21.57 4.11a1 1 0 0 0-1.05-.14L3.56 11.14a1 1 0 0 0 .09 1.88l4.66 1.68 1.67 5.08a1 1 0 0 0 1.79.24l2.6-3.49 4.29 3.18a1 1 0 0 0 1.57-.61l2.34-13.9a1 1 0 0 0-.4-1.09Zm-10.9 10.35-.73 3.26-.9-2.76 7.84-7.09-6.21 6.59Zm8.47 3.07-4.11-3.04a1 1 0 0 0-1.41.2l-.72.96.97-4.32 5.95-5.97-1.68 12.17Z"></path>
           </svg>
-          Telegram
+          历史频道
         </a>
         <span class="status-chip" id="report-count">0 篇日报</span>
         <button class="status-chip" id="search-btn" aria-label="搜索日报" title="搜索">
@@ -67,30 +67,34 @@
 
     <div>
       <main>
+        <aside class="archive-notice" aria-label="更新状态">
+          <strong>本站已停止每日更新。</strong>
+          这里仅保留本工具过去生成的日报作为效果预览；内容可能过期，请勿作为当前招生信息使用。
+        </aside>
         <section class="home-view" id="home-view" hidden>
           <div class="home-hero">
             <div class="home-copy">
-              <h2>把绿群中有用的保研信息，整理成每日可读的一页</h2>
+              <h2>从群聊记录生成匿名化、可校验的 Markdown 日报</h2>
               <p>
-                绿群日报会从群聊中提取院校项目、夏令营、导师信息、经验观点和待核实风险，帮助没有时间翻完整聊天记录的同学快速跟进。
+                这些历史页面用于展示工具对院校项目、申请考核、经验观点和待核实信息的提取与组织效果。
               </p>
             </div>
             <div class="home-actions" role="group" aria-label="快捷入口">
-              <button class="primary-action" id="read-latest-btn" type="button">阅读最新日报</button>
-              <button class="secondary-action" id="home-search-btn" type="button">搜索全部日报</button>
+              <button class="primary-action" id="read-latest-btn" type="button">阅读最后一期</button>
+              <button class="secondary-action" id="home-search-btn" type="button">搜索历史日报</button>
             </div>
           </div>
 
           <section class="home-grid" aria-label="站点概览">
             <article class="home-panel latest-panel">
-              <p class="home-panel-kicker">Latest</p>
-              <h3>最新日报</h3>
+              <p class="home-panel-kicker">Final Issue</p>
+              <h3>最后一期</h3>
               <p class="home-panel-value" id="latest-report-date">正在加载...</p>
-              <p class="home-panel-note">查看最新一期群聊摘要，快速了解近期保研项目、导师信息、申请经验和待核实风险。</p>
+              <p class="home-panel-note">查看停止日更前的最后一期生成结果。页面内容不代表当前招生动态。</p>
             </article>
             <article class="home-panel">
               <p class="home-panel-kicker">Archive</p>
-              <h3>日报归档</h3>
+              <h3>历史归档</h3>
               <p class="home-panel-value" id="home-report-count">0 篇</p>
               <p class="home-panel-note">可按日期浏览，也可以用搜索定位具体院校、导师或项目关键词。</p>
             </article>
@@ -106,23 +110,23 @@
 
           <section class="recent-reports" aria-labelledby="recent-reports-title">
             <div class="section-head">
-              <p class="reader-label">Recent Reports</p>
-              <h2 id="recent-reports-title">最近日报</h2>
+              <p class="reader-label">Historical Reports</p>
+              <h2 id="recent-reports-title">历史日报</h2>
             </div>
             <div class="recent-reports-list" id="recent-reports-list">
-              <div class="date-switcher-empty">正在加载最近日报...</div>
+              <div class="date-switcher-empty">正在加载历史日报...</div>
             </div>
           </section>
 
           <section class="contribute-section" aria-labelledby="contribute-title">
             <div class="contribute-copy">
               <p class="reader-label">Contribute</p>
-              <h2 id="contribute-title">参与改进</h2>
+              <h2 id="contribute-title">使用与改进工具</h2>
               <p>
-                绿群日报还在持续迭代。如果你发现内容有误、隐私风险、分类不准，或者希望增加新的浏览方式，欢迎在 GitHub 留下反馈。
+                公开日报已经停止更新，但生成工具仍保留在 GitHub。欢迎报告代码问题、隐私风险或提出功能改进建议。
               </p>
               <p>
-                如果它刚好帮你省下一点翻群聊的时间，也可以顺手点亮 Star，让更多同学发现这份日报。
+                你可以使用自己的 ChatLab 数据在本地生成日报；发布、Telegram 和定时运行都是可选功能。
               </p>
             </div>
             <nav class="contribute-actions" aria-label="反馈与项目链接">
@@ -184,11 +188,10 @@
 
     <footer class="site-footer">
       <div class="footer-links">
-        <span>绿群日报是 <a href="https://github.com/CS-BAOYAN" target="_blank" rel="noopener noreferrer">CS-BAOYAN
-            社区</a>相关群聊信息的非官方整理项目</span>
+        <span>本页面是 <a href="https://github.com/jielosc/csbaoyan-chat-daily" target="_blank" rel="noopener noreferrer">CS Baoyan Chat Daily Generator</a> 的历史输出预览</span>
       </div>
       <p class="disclaimer-note">
-        内容由 AI 辅助归纳，仅供参考；涉及时效性、主观经验和未核实信息时，请以官方通知和公开资料为准。
+        页面已停止每日更新。内容由 AI 辅助归纳且可能过期，仅供效果展示；请以当前官方通知和公开资料为准。
       </p>
     </footer>
   </div>
@@ -198,7 +201,7 @@
     <div class="search-container">
       <div class="search-header">
         <svg class="search-icon" aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-        <input type="text" id="search-input" class="search-input" placeholder="搜索所有日报内容..." autocomplete="off">
+        <input type="text" id="search-input" class="search-input" placeholder="搜索历史日报内容..." autocomplete="off">
         <button class="close-search-btn" id="close-search-btn" aria-label="关闭搜索">
           <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>

@@ -59,7 +59,7 @@ def create_r2_client(config: R2Config):
     try:
         import boto3
     except ImportError as exc:
-        raise RuntimeError("缺少 boto3；请重新安装 requirements.txt。") from exc
+        raise RuntimeError("缺少 boto3；请运行 pip install -e . 安装项目依赖。") from exc
     return boto3.client(
         service_name="s3",
         endpoint_url=config.endpoint_url,
@@ -215,7 +215,7 @@ class R2Publisher:
         report_path: Path,
         report_date: str | None = None,
         *,
-        origin: str = "https://csbaoyan.icelon.top",
+        origin: str,
     ) -> None:
         path = report_path.resolve()
         date = validate_report_date(report_date or path.stem)

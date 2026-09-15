@@ -193,7 +193,7 @@ function showHomeView() {
   closeDateSwitcher();
   if (elements.homeView) elements.homeView.hidden = false;
   if (elements.readerView) elements.readerView.hidden = true;
-  document.title = "绿群日报";
+  document.title = "绿群日报 · 历史预览";
 }
 
 function showReaderView() {
@@ -318,7 +318,7 @@ function renderHomeView() {
   elements.recentReportsList.innerHTML = state.manifest
     .slice(0, 7)
     .map((item, index) => {
-      const label = index === 0 ? '<span class="recent-report-label">最新</span>' : "";
+      const label = index === 0 ? '<span class="recent-report-label">最后一期</span>' : "";
       return `
         <a class="recent-report-item" href="#${item.date}" data-date="${item.date}">
           <span class="recent-report-meta">
@@ -357,7 +357,7 @@ async function loadRecentReportSummaries() {
 
 function updateHeader(item) {
   elements.reportCount.textContent = `${state.manifest.length} 篇日报`;
-  document.title = `${item.date} | 绿群日报`;
+  document.title = `${item.date} | 绿群日报历史预览`;
 }
 
 async function loadReport(date) {

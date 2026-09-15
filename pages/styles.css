@@ -208,6 +208,23 @@ button.status-chip svg {
   display: none;
 }
 
+.archive-notice {
+  margin-bottom: 20px;
+  padding: 14px 16px;
+  border: 1px solid #bf8700;
+  border-radius: var(--radius-lg);
+  background: #fff8c5;
+  color: #4d2d00;
+  font-size: 0.92rem;
+  line-height: 1.65;
+}
+
+[data-theme="dark"] .archive-notice {
+  border-color: #9e6a03;
+  background: #3b2e00;
+  color: #f8e3a1;
+}
+
 .home-hero {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

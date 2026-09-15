@@ -116,7 +116,7 @@ def _generate_options(args: argparse.Namespace) -> GenerateOptions:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="CS Baoyan chat daily report tools.")
+    parser = argparse.ArgumentParser(description="Generate privacy-checked daily reports from ChatLab exports.")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     generate_parser = subparsers.add_parser("generate", help="Generate a daily report.")

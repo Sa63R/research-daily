@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "csbaoyan-chat-daily"
+version = "0.1.0"
+description = "Generate privacy-checked Markdown daily reports from ChatLab exports."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "jielosc" }]
+dependencies = [
+  "openai>=1.30.0",
+  "python-dotenv>=1.0.0",
+  "boto3>=1.35.0",
+  "socksio>=1.0.0,<2",
+]
+
+[project.scripts]
+csbaoyan-daily = "csbaoyan_daily.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

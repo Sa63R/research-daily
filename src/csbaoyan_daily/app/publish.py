@@ -9,6 +9,7 @@ from ..config import (
     R2_BUCKET,
     R2_PUBLIC_BASE_URL,
     R2_SECRET_ACCESS_KEY,
+    SITE_BASE_URL,
 )
 from ..infra.r2 import R2Config, R2Publisher, R2PublishResult
 
@@ -34,7 +35,11 @@ def run_publish(options: PublishOptions) -> R2PublishResult:
     publisher = R2Publisher(r2_config_from_environment())
     result = publisher.publish(options.report_path, options.report_date)
     if options.verify_public:
-        publisher.verify_public_report(options.report_path, options.report_date)
+        publisher.verify_public_report(
+            options.report_path,
+            options.report_date,
+            origin=_public_verify_origin(),
+        )
     return result
 
 
@@ -46,4 +51,12 @@ def run_public_verify(report_path: Path, report_date: str | None = None) -> None
     R2Publisher(r2_config_from_environment()).verify_public_report(
         report_path,
         report_date,
+        origin=_public_verify_origin(),
     )
+
+
+def _public_verify_origin() -> str:
+    origin = str(SITE_BASE_URL or "").strip().rstrip("/")
+    if not origin:
+        raise ValueError("公网校验需要配置 SITE_BASE_URL。")
+    return origin

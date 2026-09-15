@@ -3,7 +3,7 @@
     {
       "allowed": {
         "origins": [
-          "https://csbaoyan.icelon.top",
+          "__SITE_ORIGIN__",
           "http://localhost:8080"
         ],
         "methods": [

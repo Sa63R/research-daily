@@ -29,7 +29,7 @@ EXPORT_DIR = Path(os.getenv("CSBAOYAN_EXPORT_DIR", "chat_exports"))
 REPORT_DIR = Path(os.getenv("CSBAOYAN_REPORT_DIR", "internal/reports"))
 
 # Message source config
-CHAT_SOURCE = os.getenv("CSBAOYAN_SOURCE", "export").strip().lower()
+CHAT_SOURCE = os.getenv("CSBAOYAN_SOURCE", "json").strip().lower()
 REPORT_TIMEZONE = os.getenv("CSBAOYAN_TIMEZONE", "Asia/Shanghai").strip()
 QQNT_EXPORT_COMMAND = Path(os.getenv("QQNT_EXPORT_COMMAND", "qqnt-export-macos"))
 _qqnt_key_path = os.getenv("QQNT_KEY_PATH", "").strip()
@@ -63,10 +63,8 @@ SITE_BASE_URL = os.getenv("SITE_BASE_URL")
 R2_ACCOUNT_ID = os.getenv("R2_ACCOUNT_ID")
 R2_ACCESS_KEY_ID = os.getenv("R2_ACCESS_KEY_ID")
 R2_SECRET_ACCESS_KEY = os.getenv("R2_SECRET_ACCESS_KEY")
-R2_BUCKET = os.getenv("R2_BUCKET", "csbaoyan-chat-daily")
-R2_PUBLIC_BASE_URL = os.getenv(
-    "R2_PUBLIC_BASE_URL", "https://data.csbaoyan.icelon.top"
-)
+R2_BUCKET = os.getenv("R2_BUCKET")
+R2_PUBLIC_BASE_URL = os.getenv("R2_PUBLIC_BASE_URL")
 
 
 def resolve_path(path: Path, base: Path | None = None) -> Path:

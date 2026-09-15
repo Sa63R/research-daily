@@ -1,92 +1,111 @@
-# 绿群日报（CS Baoyan Chat Daily） 📰
+# CS Baoyan Chat Daily Generator 📰
 
-CS（Computer Science）保研群（[绿群](https://github.com/CS-BAOYAN)）每日 AI 信息总结（非官方）。
+从 ChatLab 群聊导出生成匿名化、可校验的 Markdown 日报。项目默认面向 CS 保研群聊，但生成、检查和发布流程可以独立使用。
 
-- 网站：https://csbaoyan.icelon.top
-- 日报数据：Cloudflare R2
-- 默认消息源：[qqnt-export-macos](https://github.com/jielosc/qqnt-export-macos) 本地只读热镜像
+> [!IMPORTANT]
+> 维护者已停止公开日报的每日更新。[Pages 网站](https://csbaoyan.icelon.top)仅作为历史生成效果预览，不代表当前招生信息。
 
-## 工作流
+## 核心能力
 
-每天 06:30（北京时间）处理前一天 `00:00–24:00` 的群消息：
+- 消费已有 ChatLab JSON，或调用 [`qqnt-export-macos`](https://github.com/jielosc/qqnt-export-macos) 导出指定自然日的消息；
+- 在调用模型前对发送者、联系方式和链接进行匿名化；
+- 使用 OpenAI 兼容 API 分块提取信息，并保留内部证据编号；
+- 确定性渲染四板块 Markdown，执行结构和隐私风险检查；
+- 可选发布到 Cloudflare R2，并发送 Telegram 概览；
+- 可选使用 macOS LaunchAgent 或 Windows 任务计划定时运行。
 
-1. 调用本机 `qqnt-export-macos export-chatlab`，导出目标自然日的 ChatLab JSON；
-2. 读取 ChatLab JSON，对发送者、联系方式和链接进行匿名化；
-3. 用 OpenAI 兼容 API 将分块聊天提取为带证据编号的结构化候选信息；
-4. 合并候选信息并确定性渲染四板块 Markdown 日报，再执行结构与隐私风险检查；
-5. 上传 `reports/YYYY-MM-DD.md` 到 R2，再刷新 `reports.json`；
-6. 可选发送 Telegram 概览。
+```text
+ChatLab JSON → 匿名化 → LLM 结构化提取 → 校验 → Markdown
+                                                  ├─ R2（可选）
+                                                  └─ Telegram（可选）
+```
 
-原始 QQ 正文只保存在本机权限为 `0600`、被 Git 忽略的 `chat_exports/` 中，并在生成日报时读入进程内存。脱敏记录、中间结果和最终报告保存在同样被 Git 忽略的 `internal/`；GitHub Pages 仓库只保存前端代码，不提交聊天数据或日报数据。
-
-项目边界如下：
-
-- `qqnt-export-macos` 负责 QQ 数据库、热镜像、protobuf、回复关系和 ChatLab 文件输出；
-- 本项目只编排导出命令并消费 ChatLab JSON，不读取 QQ 数据库，也不解析 QQ 私有消息格式；
-- `chat_exports/chatlab-YYYY-MM-DD.json` 是两个项目之间唯一的数据接口。
+原始消息、脱敏记录、中间结果和最终报告默认保存在被 Git 忽略的私有目录中。仓库不包含公开日报的数据源；`pages/` 只是读取历史公开数据的静态预览前端。
 
 ## 快速开始
 
+需要 Python 3.10 或更高版本：
+
 ```bash
 python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
+.venv/bin/pip install -e .
 cp .env.example .env
 chmod 600 .env
 ```
 
-编辑 `.env`，至少配置：
+最小模型配置：
 
-- `QQNT_EXPORT_COMMAND`、`QQNT_KEY_PATH`、`QQNT_CONVERSATION_ID`
-- `OPENAI_BASE_URL`、`OPENAI_API_KEY`、`OPENAI_MODEL`
-- `OPENROUTER_PROVIDER_ORDER`（当前建议为 `z-ai,deepinfra`）
-- `R2_ACCOUNT_ID`、`R2_ACCESS_KEY_ID`、`R2_SECRET_ACCESS_KEY`
+```dotenv
+OPENAI_BASE_URL=https://your-provider.example/v1
+OPENAI_API_KEY=your-api-key
+OPENAI_MODEL=your-model
+```
 
-可选设置 `OPENAI_FINAL_MODEL`，让跨 Chunk 合并使用质量更高的模型；未设置时与 `OPENAI_MODEL` 相同。
-默认按最多 2 万字符或 400 条消息切分（重叠 20 条），每个分块最多输出 3500 tokens、每个终稿板块最多输出 20000 tokens；`--timeout`（默认 240 秒）与 `--final-timeout`（默认 300 秒）是覆盖重试和退避等待的单次结构化编辑总耗时上限。程序会在多次尝试之间预留预算，避免单个卡住的请求耗尽全部重试时间。分块默认最多 2 路并发，以兼顾吞吐量和模型上游稳定性；终稿也按最多两个板块并行独立编辑，通过校验的板块会保存为私有缓存，再由程序合并并整体验证。
-对强制推理且默认推理强度过高的已知模型，分块提取和终稿编辑都会使用较低推理强度，把输出预算优先留给最终 JSON；所有结构约束仍由本地校验器执行。OpenRouter Provider 顺序由 `OPENROUTER_PROVIDER_ORDER` 配置；例如 `z-ai,deepinfra` 会优先使用 Z.AI，失败时只回退到 DeepInfra，不会落到 Wafer 等名单外端点。留空则使用 OpenRouter 自动路由。
+将目标日期的 ChatLab 文件放到输入目录，例如 `chatlab-2026-09-06.json`，然后生成本地日报：
+
+```bash
+csbaoyan-daily generate \
+  --source json \
+  --export-dir /path/to/chatlab-json \
+  --report-dir ./internal/reports \
+  --date 2026-09-06
+```
+
+输出为 `internal/reports/2026-09-06.md`。仅本地生成不需要 QQ、R2 或 Telegram 配置。
+
+## 输入与项目边界
+
+公开输入边界是 ChatLab JSON：
+
+- 文件必须包含 `chatlab.version`、`meta`、`members` 和 `messages`；
+- 每条消息至少包含 `platformMessageId`、`sender`、`timestamp`、`type` 和 `content`；
+- 文件名建议包含目标日期，例如 `chatlab-YYYY-MM-DD.json`。
+
+当使用 `--source export` 时，本项目只编排 `qqnt-export-macos export-chatlab`，不读取 QQ 数据库，也不解析 QQ 私有消息格式。此模式还需要配置 `QQNT_EXPORT_COMMAND`、`QQNT_KEY_PATH` 和 `QQNT_CONVERSATION_ID`。
 
 ## 日报结构
 
-新生成的日报固定包含四个板块：
+默认模板包含四个板块：
 
-1. **今日值得关注**：按“院校与项目”“申请与考核”“经验与选择”最多三个类别整理高价值内容，不要求读者立即行动；
-2. **今日讨论脉络**：按时间顺序详细概括有内容的话题，包括讨论焦点、关键观点、分歧或阶段性结论；
-3. **传闻与待核实**：单一信源、相互矛盾、仅有提问或缺少原始证据的消息；
-4. **轻松一刻**：少量脱离上下文仍能理解、且不会伤害具体个人的有趣片段。
+1. **今日值得关注**：院校与项目、申请与考核、经验与选择；
+2. **今日讨论脉络**：按时间顺序概括话题、观点、分歧和阶段性结论；
+3. **传闻与待核实**：单一信源、矛盾或缺少原始证据的信息；
+4. **轻松一刻**：少量脱离上下文仍能理解且不会伤害具体个人的片段。
 
-分块提取结果保存为私有 JSON。最终 Markdown 由程序渲染，模型输出中的证据编号仅用于内部校验，不会公开。
+分块提取结果只用于内部校验，公开 Markdown 不包含证据编号。
 
-QQ 桥接的安装和 key 获取请参考 [qqnt-export-macos 文档](https://github.com/jielosc/qqnt-export-macos)。R2 部署、历史迁移和定时任务见[部署指南](./docs/deploy-guide.md)。
+## 可选集成
 
-macOS 定时任务通过独立的 `GreenDailyRunner.app` 启动，不需要给 Homebrew 的通用 Python 完全磁盘访问权限。Runner 使用固定 bundle identifier，只执行本项目内固定的日报脚本；安装与授权步骤见部署指南。
-
-## CLI
+完整流水线可以串联生成、检查、R2 发布和 Telegram 播报：
 
 ```bash
-# 先由 qqnt-export-macos 生成当日 ChatLab JSON，再生成本地日报
-PYTHONPATH=src .venv/bin/python -m csbaoyan_daily.cli generate --date 2026-09-06
-
-# 完整日更：生成、检查、上传 R2、可选 Telegram
-scripts/daily_pipeline.sh
-
-# 只生成和检查，不上传
-scripts/daily_pipeline.sh --skip-upload
-
-# 使用已有 ChatLab JSON 回填（不会访问 QQ）
-scripts/daily_pipeline.sh --source json --export-dir /path/to/chatlab-json --date 2026-05-18
-
-# 将现有 Markdown 批量迁移到 R2
-PYTHONPATH=src .venv/bin/python -m csbaoyan_daily.cli migrate-r2 \
-  --reports-dir /path/to/reports
+scripts/daily_pipeline.sh --date 2026-09-06
 ```
 
-目标日期没有有效消息时，流水线正常结束且不会改动 R2 索引。QQ、LLM、隐私检查或 R2 失败时会非零退出，并保留当前公开索引。
+这些集成都不是本地生成的前置条件：
 
-## 免责声明
+- 自动 QQ 导出需要 `QQNT_*` 配置；
+- R2 发布需要完整的 `R2_*` 配置；
+- Telegram 播报需要 `TELEGRAM_*` 和 `SITE_BASE_URL`；
+- 定时任务、R2 和预览站部署见[可选部署指南](./docs/deploy-guide.md)。
+
+所有可用命令可以通过以下方式查看：
+
+```bash
+csbaoyan-daily --help
+```
+
+## 历史预览
+
+[csbaoyan.icelon.top](https://csbaoyan.icelon.top) 展示本工具过去生成的日报。预览数据现已冻结；页面中的日期、项目、导师和招生信息可能已经过期。
+
+Pages 前端仍可随代码变更部署，但不会触发日报生成，也不会向 R2 写入新数据。
+
+## 隐私与免责声明
 
 日报由 AI 从群聊中整理，可能存在遗漏或错误。涉及夏令营、预推免、招生制度和导师信息时，请以官方通知及公开资料为准。
 
-项目会尽量匿名化聊天内容，但无法保证所有上下文都绝对不可识别。如果你发现身份暴露、内容错误或其他风险，请通过 [GitHub Issues](https://github.com/jielosc/csbaoyan-chat-daily/issues/new) 反馈。
+匿名化和风险检查只能降低风险，无法保证所有上下文都绝对不可识别。使用者应在发布前人工复核，并妥善保护 ChatLab 导出、`.env` 和私有生成目录。
 
 ## License
 
