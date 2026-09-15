@@ -29,7 +29,7 @@ class ReportSchemaTests(unittest.TestCase):
     def test_final_schema_constrains_evidence_to_each_section(self) -> None:
         response_format = structured_response_format(
             "daily",
-            {"high_value": 12, "timeline_topics": 14, "uncertain": 8, "light_moments": 3},
+            {"high_value": 12, "timeline_topics": 24, "uncertain": 8, "light_moments": 3},
             {
                 "high_value": {"M00001"},
                 "timeline_topics": {"M00002"},

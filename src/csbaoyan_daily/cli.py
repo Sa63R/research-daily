@@ -77,7 +77,7 @@ def add_generate_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--timeout", type=float, default=240.0)
     parser.add_argument("--final-timeout", type=float, default=300.0)
     parser.add_argument("--chunk-max-output-tokens", type=int, default=3500)
-    parser.add_argument("--final-max-output-tokens", type=int, default=12000)
+    parser.add_argument("--final-max-output-tokens", type=int, default=20000)
     parser.add_argument("--temperature", type=float, default=0.2)
     parser.add_argument("--max-workers", type=int, default=2)
     parser.add_argument("--base-url", default=OPENAI_BASE_URL)

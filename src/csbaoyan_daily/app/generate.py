@@ -67,7 +67,7 @@ class GenerateOptions:
     timeout: float = 240.0
     final_timeout: float = 300.0
     chunk_max_output_tokens: int = 3500
-    final_max_output_tokens: int = 12000
+    final_max_output_tokens: int = 20000
     temperature: float = 0.2
     max_workers: int = 2
     base_url: str | None = OPENAI_BASE_URL

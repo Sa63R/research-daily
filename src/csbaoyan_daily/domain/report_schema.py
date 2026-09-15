@@ -20,7 +20,7 @@ CHUNK_ITEM_LIMITS = {
 }
 FINAL_ITEM_LIMITS = {
     "high_value": 12,
-    "timeline_topics": 14,
+    "timeline_topics": 24,
     "uncertain": 8,
     "light_moments": 3,
 }
