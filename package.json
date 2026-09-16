@@ -1,0 +1,6 @@
+{
+  "name": "research-daily", "private": true, "type": "module",
+  "scripts": { "test": "node --test automation/test/*.test.mjs && node tests/pages-homepage.test.mjs", "daily": "node automation/run.mjs" },
+  "engines": { "node": ">=22" },
+  "dependencies": { "ws": "8.21.3" }
+}

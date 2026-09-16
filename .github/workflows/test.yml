@@ -21,4 +21,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - run: node tests/pages-homepage.test.mjs
+      - run: npm ci --ignore-scripts
+      - run: npm test

@@ -1,0 +1,14 @@
+{
+  "type":"object","additionalProperties":false,"required":["title","summary","sections"],
+  "properties":{
+    "title":{"type":"string"},"summary":{"type":"string"},
+    "sections":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["name","items"],"properties":{
+      "name":{"type":"string","enum":["保研信息","科研与学习","值得收藏","待核实"]},
+      "items":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["title","text","nextStep","basis","evidenceIds","links"],"properties":{
+        "title":{"type":"string"},"text":{"type":"string"},"nextStep":{"type":"string"},"basis":{"type":"string"},
+        "evidenceIds":{"type":"array","items":{"type":"string"}},
+        "links":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["title","url"],"properties":{"title":{"type":"string"},"url":{"type":"string"}}}}
+      }}}
+    }}}
+  }
+}

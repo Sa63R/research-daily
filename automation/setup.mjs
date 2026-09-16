@@ -1,0 +1,30 @@
+import { randomBytes } from 'node:crypto';
+import { resolve } from 'node:path';
+import { existsSync } from 'node:fs';
+import { ROOT,PRIVATE,loadJson,saveJson } from './core.mjs';
+
+const args=process.argv.slice(2);const value=key=>args.includes(key)?args[args.indexOf(key)+1]:undefined;
+const file=resolve(PRIVATE,'config.json');
+const previous=loadJson(file,{});
+const c={websocket:'ws://127.0.0.1:3001',token:randomBytes(32).toString('hex'),salt:randomBytes(32).toString('hex'),repository:'',groups:[],qqAccount:'',enabled:false,napcatDir:resolve(ROOT,'vendor','napcat'),...previous};
+if(value('--groups'))c.groups=value('--groups').split(',').map(s=>s.trim());
+if(value('--repository'))c.repository=value('--repository');
+if(value('--codex'))c.codexExecutable=value('--codex');
+if(value('--account'))c.qqAccount=value('--account');
+if(value('--napcat-dir'))c.napcatDir=resolve(value('--napcat-dir'));
+if(value('--qq-executable'))c.qqExecutable=resolve(value('--qq-executable'));
+if(c.qqAccount&&!/^\d+$/.test(c.qqAccount))throw Error('QQ 账号必须为数字');
+if(args.includes('--enable'))c.enabled=true;
+if(args.includes('--disable'))c.enabled=false;
+if(!c.groups.length||!c.groups.every(g=>/^\d+$/.test(g)))throw Error('请传入有效群号');
+const directShell=resolve(c.napcatDir,'napcat.mjs');
+c.napcatShellDir=existsSync(directShell)?resolve(c.napcatDir):resolve(c.napcatDir,'napcat');
+if(!c.qqExecutable){const qq=resolve(process.env.ProgramFiles||'C:/Program Files','Tencent','QQNT','QQ.exe');if(existsSync(qq))c.qqExecutable=qq;}
+saveJson(file,c);
+const napConfig=resolve(c.napcatShellDir,'config');
+const webui=loadJson(resolve(napConfig,'webui.json'),{});
+saveJson(resolve(napConfig,'webui.json'),{...webui,host:'127.0.0.1',port:6099,token:webui.token||randomBytes(24).toString('hex'),loginRate:3});
+const onebot={network:{httpServers:[],httpClients:[],websocketServers:[{name:'local-history-reader',enable:true,host:'127.0.0.1',port:3001,messagePostFormat:'array',reportSelfMessage:true,enableForcePushEvent:true,debug:false,heartInterval:30000,token:c.token}],websocketClients:[]},musicSignUrl:'',enableLocalFile2Url:false,parseMultMsg:false};
+saveJson(resolve(napConfig,'onebot11.json'),onebot);
+if(c.qqAccount)saveJson(resolve(napConfig,`onebot11_${c.qqAccount}.json`),onebot);
+console.log('本机群号、读取密钥和 QQ 接口配置已保存；密钥未输出。');

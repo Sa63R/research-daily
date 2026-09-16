@@ -19,7 +19,7 @@ class ChatExportTests(unittest.TestCase):
             command=Path("qqnt-export-macos"),
             key_path=Path("/tmp/database.key"),
             cache_dir=Path("/tmp/cache"),
-            conversation_id="group:943826679",
+            conversation_id="group:123456789",
         )
 
     def test_exports_one_completed_day_to_chatlab_json(self) -> None:
@@ -46,7 +46,7 @@ class ChatExportTests(unittest.TestCase):
         command = run.call_args.args[0]
         self.assertIn("export-chatlab", command)
         self.assertEqual(command[command.index("--date") + 1], "2026-09-06")
-        self.assertEqual(command[command.index("--conversation") + 1], "group:943826679")
+        self.assertEqual(command[command.index("--conversation") + 1], "group:123456789")
         self.assertIn("--overwrite", command)
 
     def test_rejects_a_day_that_has_not_finished(self) -> None:
