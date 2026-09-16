@@ -55,6 +55,7 @@ test('resource URLs reject contact addresses, encoded identities and signed priv
 test('inline prose cannot bypass link checks with Markdown, images or HTML',()=>{
   const {packet,report}=publicationFixture();
   report.summary='[联系](https://wpa.qq.com.cn/msgrd?uin=88888)';
+  report.sections[0].items[0].nextStep='www.example.org/download?token=secret';
   report.sections[0].items[0].text='![图片](https://example.com/pixel.png) <img src="https://example.com/image.png"> [私有资源](https://example.com/?token=secret)';
   const markdown=renderReport(report,packet);
   assert.ok(!markdown.includes('uin='));assert.ok(!markdown.includes('token=secret'));

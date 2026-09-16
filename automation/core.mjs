@@ -4,6 +4,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import WebSocket from 'ws';
 import { isIP } from 'node:net';
+import { validateEditorialReport, renderEditorialReport } from './editorial.mjs';
 
 export const ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 export const PRIVATE=process.env.RESEARCH_DAILY_PRIVATE || resolve(ROOT,'.private');
@@ -51,10 +52,10 @@ export function publicResourceUrl(value,markers=[]) {
   return url.href;
 }
 export function publicText(value,markers=[]) {
-  let text=String(value).replace(/https?:\/\/[^\s<>"`\[\]\\]+/gi,raw=>{
+  let text=String(value).replace(/(?:https?:\/\/|\bwww\.)[^\s<>"`\[\]\\]+/gi,raw=>{
     const suffix=raw.match(/[),.;，。！？；、]+$/)?.[0]||'';
     const candidate=suffix?raw.slice(0,-suffix.length):raw;
-    try{publicResourceUrl(candidate,markers);return raw;}catch{return '[私人链接已移除]'+suffix;}
+    try{publicResourceUrl(/^www\./i.test(candidate)?'https://'+candidate:candidate,markers);return raw;}catch{return '[私人链接已移除]'+suffix;}
   });
   text=redact(text).replace(/成员[a-f\d]{6}\b|\bm_[a-f\d]{24}\b/gi,'[已匿名]')
     .replace(/(?:群号|QQ群号|QQ号)\s*[:：]?\s*\d{5,12}/gi,'[已匿名]');
@@ -111,6 +112,7 @@ export async function readHistory(reader,c,group,day,{maxPages=500,pause=()=>new
   return {messages,coverage:{group:group,day,pages,firstReturnedAt:oldestTime,lastReturnedAt:newestTime,boundaryReached:boundary,reason,suspectedGaps:gaps,unreadMedia:messages.filter(m=>m.hasUnread).length,complete:false}};
 }
 export function validateReport(report,packet){
+  if(report?.schemaVersion===2)return validateEditorialReport(report,packet);
   if(!report||typeof report.title!=='string'||!report.title.trim()||typeof report.summary!=='string'||!Array.isArray(report.sections))throw Error('日报结构无效');
   const known=new Set(packet.messages.map(m=>m.id));const seen=new Set();
   for(const section of report.sections){if(!sections.includes(section.name)||seen.has(section.name)||!Array.isArray(section.items))throw Error('日报分类无效');seen.add(section.name);for(const item of section.items){if(typeof item.title!=='string'||typeof item.text!=='string'||!Array.isArray(item.evidenceIds)||!item.evidenceIds.length||!item.evidenceIds.every(id=>known.has(id)))throw Error('日报条目缺少有效消息依据');if(!Array.isArray(item.links))throw Error('资源链接无效');for(const link of item.links){const u=new URL(link.url);if(!['https:','http:'].includes(u.protocol)||u.username||u.password)throw Error('资源链接协议无效');if(typeof link.title!=='string')throw Error('资源链接名称无效');}}}
@@ -125,6 +127,7 @@ export function validateReport(report,packet){
 }
 function mdText(text){return publicText(text).replace(/\\/g,'\\\\').replace(/[\[\]]/g,'\\$&').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 export function renderReport(report,packet){
+  if(report?.schemaVersion===2)return renderEditorialReport(report,packet);
   validateReport(report,packet);
   const lines=[`# ${packet.date} 保研与科研日报`,'',mdText(report.summary),''];
   for(const section of report.sections){if(!section.items.length)continue;lines.push(`## ${section.name}`,'');for(const item of section.items){lines.push(`### ${mdText(item.title)}`,'',mdText(item.text),'');if(item.nextStep)lines.push(`**怎么开始：** ${mdText(item.nextStep)}`,'');for(const link of item.links){const url=new URL(link.url).href.replace(/\(/g,'%28').replace(/\)/g,'%29');lines.push(`- [${mdText(link.title)}](${url})`);}if(item.links.length)lines.push('');if(item.basis)lines.push(`*${mdText(item.basis)}*`,'');}}

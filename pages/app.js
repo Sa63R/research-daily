@@ -162,10 +162,7 @@ function extractOverview(markdownText) {
     return "本期概览暂不可用，点击查看日报正文。";
   }
 
-  return overview
-    .replace(/^([-+*]|\d+[.)])\s+/, "")
-    .replace(/[#*`_>]/g, "")
-    .trim();
+  return markdownPlainText(overview);
 }
 
 function escapeHtml(text) {
@@ -209,7 +206,18 @@ function renderMarkdown(markdownText) {
     breaks: false,
     gfm: true,
   });
-  return window.DOMPurify.sanitize(rawHtml);
+  return window.DOMPurify.sanitize(rawHtml, {
+    ALLOWED_TAGS: ['h1', 'h2', 'h3', 'h4', 'p', 'br', 'strong', 'em', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code', 'hr', 'a', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'del'],
+    ALLOWED_ATTR: ['href', 'title', 'start', 'colspan', 'rowspan'],
+    ALLOW_DATA_ATTR: false,
+    ALLOW_ARIA_ATTR: false,
+  });
+}
+
+function markdownPlainText(markdownText) {
+  const template = document.createElement('template');
+  template.innerHTML = renderMarkdown(markdownText);
+  return template.content.textContent.replace(/\s+/g, ' ').trim();
 }
 
 function getActiveIndex() {

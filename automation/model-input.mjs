@@ -36,3 +36,39 @@ export function messageChunks(messages, maxChars = 140000) {
   if (chunk.length) chunks.push(chunk);
   return chunks;
 }
+
+// Match the upstream editor's 20k-character / 400-message windows and keep
+// 20 messages of context across cuts. Character accounting covers the readable
+// chat transcript rather than JSON keys and opaque local evidence IDs.
+export function editorialChunks(messages, { maxChars = 20000, maxMessages = 400, overlapMessages = 20 } = {}) {
+  if (![maxChars, maxMessages, overlapMessages].every(Number.isSafeInteger) || maxChars <= 0 || maxMessages <= 0 || overlapMessages < 0 || overlapMessages >= maxMessages) throw new RangeError('Invalid editorial chunk limits');
+  const chunks = [];
+  let start = 0;
+  while (start < messages.length) {
+    let end = start, size = 0;
+    while (end < messages.length && end - start < maxMessages) {
+      const message = messages[end];
+      const length = `${message.time || ''} ${message.author || ''}: ${message.text}`.length + 1;
+      if (end > start && size + length > maxChars) break;
+      size += length;
+      end++;
+    }
+    chunks.push(messages.slice(start, end));
+    if (end === messages.length) break;
+    // A single oversized message must still advance the next window.
+    start = Math.max(start + 1, end - overlapMessages);
+  }
+  return chunks;
+}
+
+export function validateTimelineEvidenceTimes(report, packet) {
+  const messages = new Map(packet.messages.map(message => [message.id, message]));
+  for (const topic of report.timeline || []) {
+    const times = topic.evidenceIds.map(id => messages.get(id)?.time).filter(time => Number.isFinite(time))
+      .map(time => localClock.format(new Date(time * 1000)).slice(0, 5));
+    if (times.length && !times.some(time => time >= topic.startTime && time <= topic.endTime)) {
+      throw Error(`讨论“${topic.title}”的 ${topic.startTime}–${topic.endTime} 与引用消息时间不符，请依据消息校正时间`);
+    }
+  }
+  return report;
+}
