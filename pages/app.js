@@ -191,9 +191,8 @@ function showMessage(className, message) {
 
 function showHomeView() {
   closeDateSwitcher();
-  if (elements.homeView) elements.homeView.hidden = false;
-  if (elements.readerView) elements.readerView.hidden = true;
-  document.title = "绿群日报 · 历史预览";
+  document.title = "保研与科研日报";
+  loadReport(state.manifest[0]?.date);
 }
 
 function showReaderView() {
@@ -357,7 +356,7 @@ async function loadRecentReportSummaries() {
 
 function updateHeader(item) {
   elements.reportCount.textContent = `${state.manifest.length} 篇日报`;
-  document.title = `${item.date} | 绿群日报历史预览`;
+  document.title = `${item.date} | 保研与科研日报`;
 }
 
 async function loadReport(date) {
@@ -365,7 +364,7 @@ async function loadReport(date) {
   if (!item) {
     showReaderView();
     showLoading(false);
-    showMessage("empty-state", "暂无可展示的日报。");
+    showMessage("empty-state", "暂无日报。首次同步完成后，昨天的内容会显示在这里。");
     return;
   }
 

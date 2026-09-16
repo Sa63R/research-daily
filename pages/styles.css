@@ -20,6 +20,9 @@
   --radius-md: 6px;
 }
 
+.site-footer > a { font-size: 0.875rem; }
+.date-nav-btn { font-size: 1.6rem; }
+
 * {
   box-sizing: border-box;
 }

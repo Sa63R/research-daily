@@ -21,3 +21,10 @@ logs/
 *.log
 Thumbs.db
 .DS_Store
+
+# Private QQ messages, login state and local tools.
+.private/
+.runtime/
+vendor/
+node_modules/
+.sites-runtime/

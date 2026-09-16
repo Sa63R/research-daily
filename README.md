@@ -1,112 +1,28 @@
-# CS Baoyan Chat Daily Generator 📰
+# 保研与科研日报
 
-从 ChatLab 群聊导出生成匿名化、可校验的 Markdown 日报。项目默认面向 CS 保研群聊，但生成、检查和发布流程可以独立使用。
+基于 [jielosc/csbaoyan-chat-daily](https://github.com/jielosc/csbaoyan-chat-daily) 的个人日报项目，保留原站的阅读样式、日期切换、全文搜索和深浅色模式。
 
-> [!IMPORTANT]
-> 维护者已停止公开日报的每日更新。[Pages 网站](https://csbaoyan.icelon.top)仅作为历史生成效果预览，不代表当前招生信息。
+网页由 GitHub Pages 托管。Windows 登录后从 QQ 回读前一天的群聊历史，使用已登录的 Codex 生成脱敏日报，自动更新网站。无需额外模型 API Key。
 
-## 核心能力
+## 内容
 
-- 消费已有 ChatLab JSON，或调用 [`qqnt-export-macos`](https://github.com/jielosc/qqnt-export-macos) 导出指定自然日的消息；
-- 在调用模型前对发送者、联系方式和链接进行匿名化；
-- 使用 OpenAI 兼容 API 分块提取信息，并保留内部证据编号；
-- 确定性渲染四板块 Markdown，执行结构和隐私风险检查；
-- 可选发布到 Cloudflare R2，并发送 Telegram 概览；
-- 可选使用 macOS LaunchAgent 或 Windows 任务计划定时运行。
+- 保研：院校项目、申请时间、考核与经验。
+- 科研：研究问题、论文阅读、实验、复现与写作方法。
+- 学习：课程、书籍、项目和工具；说明适合谁、前置基础与开始方式。
+- 过滤：重复焦虑、攀比、无信息量的情绪表达和无关闲聊。
 
-```text
-ChatLab JSON → 匿名化 → LLM 结构化提取 → 校验 → Markdown
-                                                  ├─ R2（可选）
-                                                  └─ Telegram（可选）
-```
+原始消息、QQ 登录状态、访问密钥与本机配置都不进入 Git 仓库。公开目录 `pages/` 只放网页及最终脱敏日报。部署任务只上传该目录。
 
-原始消息、脱敏记录、中间结果和最终报告默认保存在被 Git 忽略的私有目录中。仓库不包含公开日报的数据源；`pages/` 只是读取历史公开数据的静态预览前端。
+## 运行边界
 
-## 快速开始
+QQ 历史接口可能无法补齐离线期间的所有消息。程序必须记录读取范围、疑似序号缺口及分页是否推进，并在日报中说明覆盖情况。没有读取成功时，不生成虚假的“当天没有消息”。图片、语音及未解析的转发不作为已读内容。
 
-需要 Python 3.10 或更高版本：
+本项目使用 NapCat 的非官方 QQ 接入；首次需要在本机登录，QQ 要求重新验证时仍需人工处理。Windows 只负责采集和生成，网页并不依赖本地服务器。
 
-```bash
-python3 -m venv .venv
-.venv/bin/pip install -e .
-cp .env.example .env
-chmod 600 .env
-```
+## 开发
 
-最小模型配置：
+原始 Python 生成器保留在 `src/csbaoyan_daily/`，原始部署说明保留在 `docs/`，可作为其他接入方式的参考。Windows/Codex 自动化位于 `automation/`。
 
-```dotenv
-OPENAI_BASE_URL=https://your-provider.example/v1
-OPENAI_API_KEY=your-api-key
-OPENAI_MODEL=your-model
-```
+## 许可
 
-将目标日期的 ChatLab 文件放到输入目录，例如 `chatlab-2026-09-06.json`，然后生成本地日报：
-
-```bash
-csbaoyan-daily generate \
-  --source json \
-  --export-dir /path/to/chatlab-json \
-  --report-dir ./internal/reports \
-  --date 2026-09-06
-```
-
-输出为 `internal/reports/2026-09-06.md`。仅本地生成不需要 QQ、R2 或 Telegram 配置。
-
-## 输入与项目边界
-
-公开输入边界是 ChatLab JSON：
-
-- 文件必须包含 `chatlab.version`、`meta`、`members` 和 `messages`；
-- 每条消息至少包含 `platformMessageId`、`sender`、`timestamp`、`type` 和 `content`；
-- 文件名建议包含目标日期，例如 `chatlab-YYYY-MM-DD.json`。
-
-当使用 `--source export` 时，本项目只编排 `qqnt-export-macos export-chatlab`，不读取 QQ 数据库，也不解析 QQ 私有消息格式。此模式还需要配置 `QQNT_EXPORT_COMMAND`、`QQNT_KEY_PATH` 和 `QQNT_CONVERSATION_ID`。
-
-## 日报结构
-
-默认模板包含四个板块：
-
-1. **今日值得关注**：院校与项目、申请与考核、经验与选择；
-2. **今日讨论脉络**：按时间顺序概括话题、观点、分歧和阶段性结论；
-3. **传闻与待核实**：单一信源、矛盾或缺少原始证据的信息；
-4. **轻松一刻**：少量脱离上下文仍能理解且不会伤害具体个人的片段。
-
-分块提取结果只用于内部校验，公开 Markdown 不包含证据编号。
-
-## 可选集成
-
-完整流水线可以串联生成、检查、R2 发布和 Telegram 播报：
-
-```bash
-scripts/daily_pipeline.sh --date 2026-09-06
-```
-
-这些集成都不是本地生成的前置条件：
-
-- 自动 QQ 导出需要 `QQNT_*` 配置；
-- R2 发布需要完整的 `R2_*` 配置；
-- Telegram 播报需要 `TELEGRAM_*` 和 `SITE_BASE_URL`；
-- 定时任务、R2 和预览站部署见[可选部署指南](./docs/deploy-guide.md)。
-
-所有可用命令可以通过以下方式查看：
-
-```bash
-csbaoyan-daily --help
-```
-
-## 历史预览
-
-[csbaoyan.icelon.top](https://csbaoyan.icelon.top) 展示本工具过去生成的日报。预览数据现已冻结；页面中的日期、项目、导师和招生信息可能已经过期。
-
-Pages 前端仍可随代码变更部署，但不会触发日报生成，也不会向 R2 写入新数据。
-
-## 隐私与免责声明
-
-日报由 AI 从群聊中整理，可能存在遗漏或错误。涉及夏令营、预推免、招生制度和导师信息时，请以官方通知及公开资料为准。
-
-匿名化和风险检查只能降低风险，无法保证所有上下文都绝对不可识别。使用者应在发布前人工复核，并妥善保护 ChatLab 导出、`.env` 和私有生成目录。
-
-## License
-
-[MIT](./LICENSE)
+MIT。保留原作者版权与 [LICENSE](LICENSE)。
