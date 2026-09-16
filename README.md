@@ -39,6 +39,8 @@ QQ 历史接口可能无法补齐离线期间的所有消息。程序必须记�
 
 准备 PowerShell 7、Windows QQ、Node.js 22 或更新版、已登录的 Codex CLI，以及已登录且有仓库写权限的 GitHub CLI。Codex 使用现有的 ChatGPT 登录；不需要另外配置模型 API Key。
 
+日报的提取、分栏编辑和导读生成统一固定使用 GPT-6 Astra，思考档位为中（`medium`）。自动任务显式传入这些参数，不依赖聊天窗口或 CLI 的默认档位；阶段缓存记录模型和档位，并将其纳入缓存校验。
+
 1. 从 [NapCat 官方发布页](https://github.com/NapNeko/NapCatQQ/releases) 下载 Shell 包，解压至 `vendor/napcat/napcat/`，其中应包含 `NapCatWinBootMain.exe` 和 `napcat.mjs`。程序通过本机已有的完整 QQ 安装启动。
 2. 在项目目录执行 `npm ci --ignore-scripts`，再运行 `node automation/setup.mjs --groups 你的群号 --repository 你的用户名/仓库名`。正常退出桌面 QQ，运行 `pwsh -NoProfile -File automation/login-qq.ps1 -Scan`，打开它提示的二维码图片，用手机 QQ 扫码并确认。登录状态和接口密钥只保存在本机。
 3. 运行 `node automation/setup.mjs --enable`，再运行 `pwsh -NoProfile -File automation/start-daily.ps1 -NoPublish` 测试完整流程：快速登录、采集昨天的历史、关闭本次 QQ 会话、生成草稿。输入保存在 `.private/inputs/日期.json`，草稿位于 `.private/drafts/`。
