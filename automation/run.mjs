@@ -7,7 +7,7 @@ import { validateTimelineEvidenceTimes } from './model-input.mjs';
 import { ROOT,PRIVATE,config,saveJson,loadJson,yesterday,chinaDay,bounds,QQReader,readHistory,renderReport } from './core.mjs';
 import { command,publish } from './github.mjs';
 
-const modelSettings={model:'gpt-6-astra',reasoningEffort:'medium'};
+const modelSettings={model:'gpt-6-astra',reasoningEffort:'low'};
 const args=process.argv.slice(2);const date=args.includes('--date')?args[args.indexOf('--date')+1]:yesterday();bounds(date);
 if(date>=chinaDay()&&!args.includes('--allow-today'))throw Error('只自动整理已结束的自然日');
 mkdirSync(PRIVATE,{recursive:true});
